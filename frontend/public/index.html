@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emploi du Temps - Infirmiers</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Gestion des Emplois du Temps</h1>
+      <h2>Service Infirmier</h2>
+    </header>
+
+    <main>
+      <section class="calendar-section">
+        <div class="calendar-header">
+          <button id="prev-month"><i class="fas fa-chevron-left"></i></button>
+          <h3 id="current-month">Août 2025</h3>
+          <button id="next-month"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="calendar-grid">
+          <div class="weekday">Lun</div>
+          <div class="weekday">Mar</div>
+          <div class="weekday">Mer</div>
+          <div class="weekday">Jeu</div>
+          <div class="weekday">Ven</div>
+          <div class="weekday">Sam</div>
+          <div class="weekday">Dim</div>
+          <!-- Les dates du calendrier seront générées dynamiquement par JavaScript -->
+          <div id="calendar-days"></div>
+        </div>
+      </section>
+
+      <section class="schedule-section">
+        <h3>Planning Journalier</h3>
+        <div id="daily-schedule">
+          <p>Sélectionnez une date dans le calendrier pour afficher le planning.</p>
+        </div>
+      </section>
+    </main>
+
+    <aside class="sidebar">
+      <div class="staff-section">
+        <h3>Personnel Infirmier</h3>
+        <ul id="staff-list">
+          <li>Marie Dupont</li>
+          <li>Pierre Martin</li>
+          <li>Sophie Lefebvre</li>
+          <li>Thomas Bernard</li>
+        </ul>
+        <button id="add-staff" class="btn">Ajouter</button>
+      </div>
+      
+      <div class="shift-section">
+        <h3>Services</h3>
+        <div class="shift-types">
+          <div class="shift-type">
+            <div class="color-dot morning"></div>
+            <span>Matin (7h-15h)</span>
+          </div>
+          <div class="shift-type">
+            <div class="color-dot afternoon"></div>
+            <span>Après-midi (14h-22h)</span>
+          </div>
+          <div class="shift-type">
+            <div class="color-dot night"></div>
+            <span>Nuit (21h-8h)</span>
+          </div>
+          <div class="shift-type">
+            <div class="color-dot off"></div>
+            <span>Repos</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <footer>
+      <p>© 2025 Application de Gestion d'Emploi du Temps pour Infirmiers</p>
+    </footer>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3>Ajouter un service</h3>
+      <form id="shift-form">
+        <div class="form-group">
+          <label for="staff-select">Infirmier/ère:</label>
+          <select id="staff-select" required>
+            <option value="">Sélectionner...</option>
+            <option value="1">Marie Dupont</option>
+            <option value="2">Pierre Martin</option>
+            <option value="3">Sophie Lefebvre</option>
+            <option value="4">Thomas Bernard</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="shift-select">Service:</label>
+          <select id="shift-select" required>
+            <option value="">Sélectionner...</option>
+            <option value="morning">Matin (7h-15h)</option>
+            <option value="afternoon">Après-midi (14h-22h)</option>
+            <option value="night">Nuit (21h-8h)</option>
+            <option value="off">Repos</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="date-select">Date:</label>
+          <input type="date" id="date-select" required>
+        </div>
+        <button type="submit" class="btn">Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/script.js"></script>
+</body>
+</html>
