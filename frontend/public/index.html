@@ -14,8 +14,49 @@
       <h2>Service Infirmier</h2>
     </header>
 
-    <main>
-      <section class="calendar-section">
+    <div class="left-section">
+      <!-- Section Liste Infirmiers en haut à gauche -->
+      <section class="infirmier-section">
+        <h3>Liste Infirmiers</h3>
+        <ul id="staff-list">
+          <li>Marie Dupont</li>
+          <li>Pierre Martin</li>
+          <li>Sophie Lefebvre</li>
+          <li>Thomas Bernard</li>
+        </ul>
+        <button id="add-staff" class="btn">Ajouter</button>
+      </section>
+
+      <!-- Section Statistiques en bas à gauche -->
+      <section class="statistique-section">
+        <h3>Statistiques</h3>
+        <div class="statistique-content">
+          <p>Les statistiques d'affectation des infirmiers seront affichées ici.</p>
+          <div class="shift-types">
+            <div class="shift-type">
+              <div class="color-dot morning"></div>
+              <span>Matin (7h-15h)</span>
+            </div>
+            <div class="shift-type">
+              <div class="color-dot afternoon"></div>
+              <span>Après-midi (14h-22h)</span>
+            </div>
+            <div class="shift-type">
+              <div class="color-dot night"></div>
+              <span>Nuit (21h-8h)</span>
+            </div>
+            <div class="shift-type">
+              <div class="color-dot off"></div>
+              <span>Repos</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="right-section">
+      <!-- Section Calendrier sur toute la moitié droite -->
+      <section class="calendrier-section">
         <div class="calendar-header">
           <button id="prev-month"><i class="fas fa-chevron-left"></i></button>
           <h3 id="current-month">Août 2025</h3>
@@ -32,50 +73,14 @@
           <!-- Les dates du calendrier seront générées dynamiquement par JavaScript -->
           <div id="calendar-days"></div>
         </div>
-      </section>
 
-      <section class="schedule-section">
-        <h3>Planning Journalier</h3>
+        <!-- Planning journalier inclus dans la section calendrier -->
         <div id="daily-schedule">
+          <h3>Planning Journalier</h3>
           <p>Sélectionnez une date dans le calendrier pour afficher le planning.</p>
         </div>
       </section>
-    </main>
-
-    <aside class="sidebar">
-      <div class="staff-section">
-        <h3>Personnel Infirmier</h3>
-        <ul id="staff-list">
-          <li>Marie Dupont</li>
-          <li>Pierre Martin</li>
-          <li>Sophie Lefebvre</li>
-          <li>Thomas Bernard</li>
-        </ul>
-        <button id="add-staff" class="btn">Ajouter</button>
-      </div>
-      
-      <div class="shift-section">
-        <h3>Services</h3>
-        <div class="shift-types">
-          <div class="shift-type">
-            <div class="color-dot morning"></div>
-            <span>Matin (7h-15h)</span>
-          </div>
-          <div class="shift-type">
-            <div class="color-dot afternoon"></div>
-            <span>Après-midi (14h-22h)</span>
-          </div>
-          <div class="shift-type">
-            <div class="color-dot night"></div>
-            <span>Nuit (21h-8h)</span>
-          </div>
-          <div class="shift-type">
-            <div class="color-dot off"></div>
-            <span>Repos</span>
-          </div>
-        </div>
-      </div>
-    </aside>
+    </div>
 
     <footer>
       <p>© 2025 Application de Gestion d'Emploi du Temps pour Infirmiers</p>
