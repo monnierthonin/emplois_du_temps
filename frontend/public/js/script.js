@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const dailySchedule = document.getElementById('daily-schedule');
   const modal = document.getElementById('modal');
   const closeBtn = document.querySelector('.close');
-  const addStaffBtn = document.getElementById('add-staff');
+  // const addStaffBtn = document.getElementById('add-staff'); // Ancien bouton remplacé par celui dans infirmiers.js
   const shiftForm = document.getElementById('shift-form');
 
   // Variables d'état
@@ -36,10 +36,8 @@ document.addEventListener('DOMContentLoaded', function() {
     modal.style.display = 'none';
   });
 
-  addStaffBtn.addEventListener('click', () => {
-    // Dans une version future, ceci ouvrira un modal pour ajouter du personnel
-    alert('Fonctionnalité à venir: Ajouter un membre du personnel');
-  });
+  // L'ancien gestionnaire d'événement pour ajouter un membre du personnel
+  // a été remplacé par le code dans infirmiers.js
 
   shiftForm.addEventListener('submit', (e) => {
     e.preventDefault();

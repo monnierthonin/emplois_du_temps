@@ -17,14 +17,15 @@
     <div class="left-section">
       <!-- Section Liste Infirmiers en haut à gauche -->
       <section class="infirmier-section">
-        <h3>Liste Infirmiers</h3>
-        <ul id="staff-list">
-          <li>Marie Dupont</li>
-          <li>Pierre Martin</li>
-          <li>Sophie Lefebvre</li>
-          <li>Thomas Bernard</li>
-        </ul>
-        <button id="add-staff" class="btn">Ajouter</button>
+        <div class="section-header">
+          <h3>Liste Infirmiers</h3>
+          <button id="add-infirmier" class="btn"><i class="fas fa-plus"></i> Ajouter</button>
+        </div>
+        <div class="infirmier-list-container">
+          <ul id="infirmiers-list" class="interactive-list">
+            <!-- La liste des infirmiers sera générée dynamiquement -->
+          </ul>
+        </div>
       </section>
 
       <!-- Section Statistiques en bas à gauche -->
@@ -55,29 +56,132 @@
     </div>
 
     <div class="right-section">
-      <!-- Section Calendrier sur toute la moitié droite -->
+      <!-- Section Emploi du temps sur toute la moitié droite -->
       <section class="calendrier-section">
         <div class="calendar-header">
-          <button id="prev-month"><i class="fas fa-chevron-left"></i></button>
-          <h3 id="current-month">Août 2025</h3>
-          <button id="next-month"><i class="fas fa-chevron-right"></i></button>
-        </div>
-        <div class="calendar-grid">
-          <div class="weekday">Lun</div>
-          <div class="weekday">Mar</div>
-          <div class="weekday">Mer</div>
-          <div class="weekday">Jeu</div>
-          <div class="weekday">Ven</div>
-          <div class="weekday">Sam</div>
-          <div class="weekday">Dim</div>
-          <!-- Les dates du calendrier seront générées dynamiquement par JavaScript -->
-          <div id="calendar-days"></div>
+          <div class="calendar-nav">
+            <button id="prev-week" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+            <button id="today-btn" class="nav-btn primary-btn">Aujourd'hui</button>
+            <button id="next-week" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+          </div>
+          <h3 id="current-week">Semaine du 18 au 22 août 2025</h3>
         </div>
 
-        <!-- Planning journalier inclus dans la section calendrier -->
-        <div id="daily-schedule">
-          <h3>Planning Journalier</h3>
-          <p>Sélectionnez une date dans le calendrier pour afficher le planning.</p>
+        <!-- Tableau d'emploi du temps hebdomadaire -->
+        <div class="schedule-table-container">
+          <table id="schedule-table" class="schedule-table">
+            <thead>
+              <tr>
+                <th class="room-header">Salle</th>
+                <th>Lundi</th>
+                <th>Mardi</th>
+                <th>Mercredi</th>
+                <th>Jeudi</th>
+                <th>Vendredi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Salles du bloc opératoire -->
+              <tr>
+                <td class="room-cell">Salle 16</td>
+                <td class="schedule-cell" data-day="1" data-room="salle16"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle16"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle16"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle16"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle16"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 17</td>
+                <td class="schedule-cell" data-day="1" data-room="salle17"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle17"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle17"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle17"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle17"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 18</td>
+                <td class="schedule-cell" data-day="1" data-room="salle18"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle18"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle18"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle18"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle18"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 19</td>
+                <td class="schedule-cell" data-day="1" data-room="salle19"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle19"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle19"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle19"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle19"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 20</td>
+                <td class="schedule-cell" data-day="1" data-room="salle20"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle20"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle20"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle20"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle20"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 21</td>
+                <td class="schedule-cell" data-day="1" data-room="salle21"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle21"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle21"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle21"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle21"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 22</td>
+                <td class="schedule-cell" data-day="1" data-room="salle22"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle22"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle22"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle22"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle22"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 23</td>
+                <td class="schedule-cell" data-day="1" data-room="salle23"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle23"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle23"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle23"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle23"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Salle 24</td>
+                <td class="schedule-cell" data-day="1" data-room="salle24"></td>
+                <td class="schedule-cell" data-day="2" data-room="salle24"></td>
+                <td class="schedule-cell" data-day="3" data-room="salle24"></td>
+                <td class="schedule-cell" data-day="4" data-room="salle24"></td>
+                <td class="schedule-cell" data-day="5" data-room="salle24"></td>
+              </tr>
+              
+              <!-- Salles de réveil et pré-induction -->
+              <tr>
+                <td class="room-cell">Réveil 1</td>
+                <td class="schedule-cell" data-day="1" data-room="reveil1"></td>
+                <td class="schedule-cell" data-day="2" data-room="reveil1"></td>
+                <td class="schedule-cell" data-day="3" data-room="reveil1"></td>
+                <td class="schedule-cell" data-day="4" data-room="reveil1"></td>
+                <td class="schedule-cell" data-day="5" data-room="reveil1"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Réveil 2</td>
+                <td class="schedule-cell" data-day="1" data-room="reveil2"></td>
+                <td class="schedule-cell" data-day="2" data-room="reveil2"></td>
+                <td class="schedule-cell" data-day="3" data-room="reveil2"></td>
+                <td class="schedule-cell" data-day="4" data-room="reveil2"></td>
+                <td class="schedule-cell" data-day="5" data-room="reveil2"></td>
+              </tr>
+              <tr>
+                <td class="room-cell">Pré-induction</td>
+                <td class="schedule-cell" data-day="1" data-room="perinduction"></td>
+                <td class="schedule-cell" data-day="2" data-room="perinduction"></td>
+                <td class="schedule-cell" data-day="3" data-room="perinduction"></td>
+                <td class="schedule-cell" data-day="4" data-room="perinduction"></td>
+                <td class="schedule-cell" data-day="5" data-room="perinduction"></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
@@ -87,6 +191,7 @@
     </footer>
   </div>
 
+  <!-- Modal pour les services -->
   <div id="modal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
@@ -120,7 +225,43 @@
       </form>
     </div>
   </div>
+  
+  <!-- Modal pour les infirmiers -->
+  <div id="infirmier-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3>Ajouter un infirmier</h3>
+      <form id="infirmier-form">
+        <div class="form-group">
+          <label for="infirmier-nom">Nom:</label>
+          <input type="text" id="infirmier-nom" required>
+        </div>
+        <div class="form-group">
+          <label for="infirmier-prenom">Prénom:</label>
+          <input type="text" id="infirmier-prenom" required>
+        </div>
+        <div class="form-group">
+          <label for="infirmier-status">Statut:</label>
+          <select id="infirmier-status" required>
+            <option value="J">J</option>
+            <option value="J1">J1</option>
+            <option value="J1*">J1*</option>
+            <option value="J3">J3</option>
+          </select>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="infirmier-present" checked>
+            <span>Présent</span>
+          </label>
+        </div>
+        <button type="submit" class="btn">Ajouter</button>
+      </form>
+    </div>
+  </div>
 
   <script src="js/script.js"></script>
+  <script src="js/infirmiers.js"></script>
+  <script src="js/planning.js"></script>
 </body>
 </html>
