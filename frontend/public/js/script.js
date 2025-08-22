@@ -1,3 +1,6 @@
+// URL de base de l'API pour les appels serveur
+const API_BASE_URL = '/api';
+
 document.addEventListener('DOMContentLoaded', function() {
   // Éléments du DOM
   const calendarDays = document.getElementById('calendar-days');
@@ -106,14 +109,8 @@ document.addEventListener('DOMContentLoaded', function() {
       dayNumber.textContent = i;
       day.appendChild(dayNumber);
       
-      // Exemple d'événements (à remplacer par des données réelles)
-      if (i % 3 === 0) {
-        addEventToDay(day, 'Dupont', 'morning');
-      } else if (i % 3 === 1) {
-        addEventToDay(day, 'Martin', 'afternoon');
-      } else if (i % 5 === 0) {
-        addEventToDay(day, 'Lefebvre', 'night');
-      }
+      // Les événements seront chargés depuis l'API
+      // Aucune donnée codée en dur
       
       // Événement de clic pour afficher le planning du jour
       day.addEventListener('click', () => {
@@ -148,35 +145,94 @@ document.addEventListener('DOMContentLoaded', function() {
     dayElement.appendChild(event);
   }
 
-  function showDailySchedule(date) {
+  async function showDailySchedule(date) {
     const formattedDate = `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+    const dateFormatAPI = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     
-    // Générer un planning d'exemple pour la démonstration
+    // Affichage du squelette de l'interface pendant le chargement
     dailySchedule.innerHTML = `
       <h4>Planning du ${formattedDate}</h4>
-      <table style="width:100%; margin-top:15px; border-collapse:collapse;">
-        <tr>
-          <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Infirmier/ère</th>
-          <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Service</th>
-          <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Heures</th>
-        </tr>
-        <tr>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">Marie Dupont</td>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">Matin</td>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">7h - 15h</td>
-        </tr>
-        <tr>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">Pierre Martin</td>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">Après-midi</td>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">14h - 22h</td>
-        </tr>
-        <tr>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">Sophie Lefebvre</td>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">Nuit</td>
-          <td style="padding:8px; border-bottom:1px solid #ddd;">21h - 8h</td>
-        </tr>
-      </table>
-      <button class="btn" style="margin-top:15px;" onclick="document.getElementById('modal').style.display='block'">Ajouter un service</button>
+      <div class="loading">Chargement des données...</div>
     `;
+    
+    try {
+      // Appel à l'API pour récupérer les services du jour
+      const response = await fetch(`${API_BASE_URL}/emplois-du-temps?date=${dateFormatAPI}`);
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      
+      const planningData = await response.json();
+      
+      // Construction du tableau avec les données de l'API
+      let tableContent = `
+        <h4>Planning du ${formattedDate}</h4>
+        <table style="width:100%; margin-top:15px; border-collapse:collapse;">
+          <tr>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Infirmier/ère</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Service</th>
+            <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Heures</th>
+          </tr>
+      `;
+      
+      // Si aucune donnée n'est retournée
+      if (!planningData.length) {
+        tableContent += `
+          <tr>
+            <td colspan="3" style="padding:20px; text-align:center;">Aucun service programmé pour cette date</td>
+          </tr>
+        `;
+      } else {
+        // Génération des lignes du tableau avec les données de l'API
+        planningData.forEach(item => {
+          const shiftHours = getShiftHours(item.service);
+          tableContent += `
+            <tr>
+              <td style="padding:8px; border-bottom:1px solid #ddd;">${item.prenom} ${item.nom}</td>
+              <td style="padding:8px; border-bottom:1px solid #ddd;">${getShiftName(item.service)}</td>
+              <td style="padding:8px; border-bottom:1px solid #ddd;">${shiftHours}</td>
+            </tr>
+          `;
+        });
+      }
+      
+      tableContent += `
+        </table>
+        <button class="btn" style="margin-top:15px;" onclick="document.getElementById('modal').style.display='block'">Ajouter un service</button>
+      `;
+      
+      dailySchedule.innerHTML = tableContent;
+      
+    } catch (error) {
+      console.error('Erreur lors du chargement du planning:', error);
+      dailySchedule.innerHTML = `
+        <h4>Planning du ${formattedDate}</h4>
+        <div class="error">Erreur de chargement des données</div>
+        <button class="btn" style="margin-top:15px;" onclick="document.getElementById('modal').style.display='block'">Ajouter un service</button>
+      `;
+    }
   }
+  
+  // Fonction utilitaire pour obtenir le nom du service
+  function getShiftName(shiftCode) {
+    const shifts = {
+      'morning': 'Matin',
+      'afternoon': 'Après-midi',
+      'night': 'Nuit',
+      'off': 'Repos'
+    };
+    return shifts[shiftCode] || shiftCode;
+  }
+  
+  // Fonction utilitaire pour obtenir les heures du service
+  function getShiftHours(shiftCode) {
+    const hours = {
+      'morning': '7h - 15h',
+      'afternoon': '14h - 22h',
+      'night': '21h - 8h',
+      'off': 'Jour de repos'
+    };
+    return hours[shiftCode] || '';
+  }
+
 });

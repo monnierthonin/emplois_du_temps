@@ -3,21 +3,23 @@
  * Ce fichier gère les interactions avec la liste des infirmiers
  */
 
-// Configuration de l'API
-const API_URL = 'http://localhost:5000/api';
+// La variable API_BASE_URL est définie dans script.js
 
-// Données mockup pour le développement sans backend
-const MOCK_DATA = {
-  infirmiers: [
-    { id: 1, nom: 'Dupont', prenom: 'Marie', status: 'J1', present: 1 },
-    { id: 2, nom: 'Martin', prenom: 'Pierre', status: 'J3', present: 1 },
-    { id: 3, nom: 'Lefebvre', prenom: 'Sophie', status: 'J', present: 0 },
-    { id: 4, nom: 'Bernard', prenom: 'Thomas', status: 'J1*', present: 1 }
-  ]
-};
+// Fonctions d'accès à l'API
+async function fetchInfirmiers() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/infirmiers`);
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors du chargement des infirmiers:', error);
+    return { infirmiers: [] }; // Retourne un tableau vide en cas d'erreur
+  }
+}
 
-// Déterminer si le mode mock doit être utilisé
-const USE_MOCK = true; // Mettre à false pour utiliser l'API réelle
+// Toujours utiliser l'API réelle
 
 // État de l'application
 let infirmiersList = [];
@@ -33,29 +35,23 @@ function initInfirmiersModule() {
 }
 
 /**
- * Charge la liste des infirmiers depuis l'API ou utilise des données mockup
+ * Charge la liste des infirmiers depuis l'API
  */
 async function loadInfirmiers() {
   try {
-    if (USE_MOCK) {
-      // Utiliser les données mockup
-      console.log('Utilisation des données mockup pour les infirmiers');
-      infirmiersList = [...MOCK_DATA.infirmiers]; // Copie pour éviter la référence directe
-      renderInfirmiersList();
-    } else {
-      // Utiliser l'API réelle
-      const response = await fetch(`${API_URL}/infirmiers`);
-      if (!response.ok) {
-        throw new Error('Erreur lors du chargement des infirmiers');
-      }
-      infirmiersList = await response.json();
-      renderInfirmiersList();
+    // Utiliser l'API réelle
+    const response = await fetch(`${API_BASE_URL}/infirmiers`);
+    if (!response.ok) {
+      throw new Error(`Erreur lors du chargement des infirmiers: ${response.status}`);
     }
+    const data = await response.json();
+    infirmiersList = data.infirmiers || data; // Adaptation selon la structure de la réponse API
+    renderInfirmiersList();
   } catch (error) {
     console.error('Erreur:', error);
-    showMessage('Erreur de chargement des infirmiers. Utilisation des données de démonstration.', 'warning');
-    // En cas d'erreur, utiliser quand même les données mockup
-    infirmiersList = [...MOCK_DATA.infirmiers];
+    showMessage('Erreur de chargement des infirmiers depuis l\'API.', 'error');
+    // En cas d'erreur, initialiser avec un tableau vide
+    infirmiersList = [];
     renderInfirmiersList();
   }
 }
@@ -100,59 +96,32 @@ async function handleInfirmierFormSubmit(event) {
   
   try {
     let successMessage;
+    let response;
     
-    if (USE_MOCK) {
-      // Utiliser les données mockup
-      if (isEditing) {
-        // Trouver et modifier l'infirmier dans la liste mockup
-        const index = MOCK_DATA.infirmiers.findIndex(inf => inf.id === editingId);
-        if (index !== -1) {
-          MOCK_DATA.infirmiers[index] = {
-            ...MOCK_DATA.infirmiers[index],
-            ...formData
-          };
-          successMessage = 'Infirmier modifié avec succès';
-        } else {
-          throw new Error('Infirmier non trouvé');
-        }
-      } else {
-        // Générer un nouvel ID pour l'ajout
-        const newId = Math.max(0, ...MOCK_DATA.infirmiers.map(inf => inf.id)) + 1;
-        const newInfirmier = {
-          id: newId,
-          ...formData
-        };
-        MOCK_DATA.infirmiers.push(newInfirmier);
-        successMessage = 'Infirmier ajouté avec succès';
-      }
+    if (isEditing) {
+      // Mode édition avec API
+      response = await fetch(`${API_BASE_URL}/infirmiers/${editingId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      successMessage = 'Infirmier modifié avec succès';
     } else {
-      let response;
-      
-      if (isEditing) {
-        // Mode édition avec API
-        response = await fetch(`${API_URL}/infirmiers/${editingId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
-        successMessage = 'Infirmier modifié avec succès';
-      } else {
-        // Mode ajout avec API
-        response = await fetch(`${API_URL}/infirmiers`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
-        successMessage = 'Infirmier ajouté avec succès';
-      }
-      
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'opération');
-      }
+      // Mode ajout avec API
+      response = await fetch(`${API_BASE_URL}/infirmiers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      successMessage = 'Infirmier ajouté avec succès';
+    }
+    
+    if (!response.ok) {
+      throw new Error(`Erreur lors de l'opération: ${response.status}`);
     }
     
     // Recharger la liste et masquer le modal
@@ -211,22 +180,15 @@ function renderInfirmiersList() {
  */
 async function editInfirmier(id) {
   try {
-    let infirmier;
+    // Récupérer depuis l'API
+    const response = await fetch(`${API_BASE_URL}/infirmiers/${id}`);
     
-    if (USE_MOCK) {
-      // Récupérer depuis les données mockup
-      infirmier = MOCK_DATA.infirmiers.find(inf => inf.id === id);
-      if (!infirmier) {
-        throw new Error('Infirmier non trouvé');
-      }
-    } else {
-      // Récupérer depuis l'API
-      const response = await fetch(`${API_URL}/infirmiers/${id}`);
-      if (!response.ok) {
-        throw new Error('Erreur lors de la récupération des données');
-      }
-      infirmier = await response.json();
+    if (!response.ok) {
+      throw new Error(`Erreur lors de la récupération des données: ${response.status}`);
     }
+    
+    const data = await response.json();
+    const infirmier = data.infirmier || data; // Adaptation selon la structure de la réponse API
     
     // Remplir le formulaire
     document.getElementById('infirmier-nom').value = infirmier.nom;
@@ -261,23 +223,13 @@ async function deleteInfirmier(id) {
   }
   
   try {
-    if (USE_MOCK) {
-      // Suppression dans les données mockup
-      const index = MOCK_DATA.infirmiers.findIndex(inf => inf.id === id);
-      if (index !== -1) {
-        MOCK_DATA.infirmiers.splice(index, 1);
-      } else {
-        throw new Error('Infirmier non trouvé');
-      }
-    } else {
-      // Suppression via l'API
-      const response = await fetch(`${API_URL}/infirmiers/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Erreur lors de la suppression');
-      }
+    // Suppression via l'API
+    const response = await fetch(`${API_BASE_URL}/infirmiers/${id}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erreur lors de la suppression: ${response.status}`);
     }
     
     // Recharger la liste

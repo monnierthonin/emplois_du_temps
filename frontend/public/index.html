@@ -60,12 +60,14 @@
       <section class="calendrier-section">
         <div class="calendar-header">
           <div class="calendar-nav">
-            <button id="prev-week" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+            <button id="prev-month" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
             <button id="today-btn" class="nav-btn primary-btn">Aujourd'hui</button>
-            <button id="next-week" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+            <button id="next-month" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
           </div>
+          <h3 id="current-month"></h3>
           <h3 id="current-week">Semaine du 18 au 22 août 2025</h3>
         </div>
+        <div id="calendar-days" class="calendar-grid"></div>
 
         <!-- Tableau d'emploi du temps hebdomadaire -->
         <div class="schedule-table-container">
@@ -201,10 +203,7 @@
           <label for="staff-select">Infirmier/ère:</label>
           <select id="staff-select" required>
             <option value="">Sélectionner...</option>
-            <option value="1">Marie Dupont</option>
-            <option value="2">Pierre Martin</option>
-            <option value="3">Sophie Lefebvre</option>
-            <option value="4">Thomas Bernard</option>
+            <!-- Les options seront chargées dynamiquement via l'API -->
           </select>
         </div>
         <div class="form-group">

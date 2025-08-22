@@ -23,23 +23,32 @@ function initPlanningModule() {
  */
 function setupWeekNavigation() {
   // Bouton semaine précédente
-  document.getElementById('prev-week').addEventListener('click', () => {
-    const newWeekStart = new Date(currentWeekStart);
-    newWeekStart.setDate(newWeekStart.getDate() - 7);
-    setCurrentWeek(newWeekStart);
-  });
+  const prevWeekBtn = document.getElementById('prev-week');
+  if (prevWeekBtn) {
+    prevWeekBtn.addEventListener('click', () => {
+      const newWeekStart = new Date(currentWeekStart);
+      newWeekStart.setDate(newWeekStart.getDate() - 7);
+      setCurrentWeek(newWeekStart);
+    });
+  }
 
   // Bouton semaine suivante
-  document.getElementById('next-week').addEventListener('click', () => {
-    const newWeekStart = new Date(currentWeekStart);
-    newWeekStart.setDate(newWeekStart.getDate() + 7);
-    setCurrentWeek(newWeekStart);
-  });
+  const nextWeekBtn = document.getElementById('next-week');
+  if (nextWeekBtn) {
+    nextWeekBtn.addEventListener('click', () => {
+      const newWeekStart = new Date(currentWeekStart);
+      newWeekStart.setDate(newWeekStart.getDate() + 7);
+      setCurrentWeek(newWeekStart);
+    });
+  }
 
   // Bouton aujourd'hui
-  document.getElementById('today-btn').addEventListener('click', () => {
-    setCurrentWeek(getCurrentWeekStart());
-  });
+  const todayBtn = document.getElementById('today-btn');
+  if (todayBtn) {
+    todayBtn.addEventListener('click', () => {
+      setCurrentWeek(getCurrentWeekStart());
+    });
+  }
 }
 
 /**
@@ -76,8 +85,8 @@ function setCurrentWeek(weekStartDate) {
   // Mise à jour des attributs data-date sur les cellules du planning
   updateScheduleCellDates(weekStartDate);
   
-  // Charger les données pour cette semaine (à implémenter plus tard)
-  // loadWeekData(weekStartDate);
+  // Charger les données pour cette semaine
+  loadWeekData(weekStartDate);
 }
 
 /**
@@ -132,6 +141,94 @@ function updateScheduleCellDates(weekStart) {
     cell.setAttribute('title', `${DAYS_OF_WEEK[dayOffset]} ${dateStr}`);
   });
 }
+
+/**
+ * Charge les données de planning pour une semaine depuis l'API
+ * @param {Date} weekStartDate - Date du début de semaine
+ */
+async function loadWeekData(weekStartDate) {
+  try {
+    // Préparer les dates de début et fin de la semaine pour l'API
+    const weekStart = weekStartDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
+    
+    // Calculer la date de fin (vendredi)
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setDate(weekStartDate.getDate() + 4); // Vendredi = lundi + 4
+    const weekEnd = weekEndDate.toISOString().split('T')[0];
+    
+    // Construire l'URL de l'API avec paramètres de dates
+    const apiUrl = `${API_BASE_URL}/emplois-du-temps/semaine?debut=${weekStart}&fin=${weekEnd}`;
+    
+    // Effacer les événements existants
+    clearEvents();
+    
+    // Appel à l'API
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Ajouter les événements au calendrier
+    if (data && data.length > 0) {
+      data.forEach(item => {
+        // Date de l'événement (format YYYY-MM-DD attendu dans la réponse API)
+        const eventDate = new Date(item.date);
+        
+        // Trouver la cellule correspondant à cette date
+        const dateStr = item.date;
+        const cell = document.querySelector(`.schedule-cell[data-date="${dateStr}"]`);
+        
+        if (cell) {
+          // Ajouter un événement visuel pour chaque service
+          addEventToCell(cell, item.prenom, item.service);
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des données de la semaine:', error);
+    // Afficher un message d'erreur si nécessaire
+  }
+}
+
+/**
+ * Efface tous les événements affichés dans les cellules du planning
+ */
+function clearEvents() {
+  const eventElements = document.querySelectorAll('.schedule-cell .event');
+  eventElements.forEach(event => event.remove());
+}
+
+/**
+ * Ajoute un événement visuel à une cellule du planning
+ * @param {HTMLElement} cell - Cellule du planning
+ * @param {string} name - Nom de l'infirmier
+ * @param {string} service - Code du service (morning, afternoon, night)
+ */
+function addEventToCell(cell, name, service) {
+  const event = document.createElement('div');
+  event.className = `event ${service}`;
+  event.textContent = name;
+  // Ajouter des styles spécifiques selon le service
+  switch(service) {
+    case 'morning':
+      event.classList.add('event-morning');
+      break;
+    case 'afternoon':
+      event.classList.add('event-afternoon');
+      break;
+    case 'night':
+      event.classList.add('event-night');
+      break;
+    case 'off':
+      event.classList.add('event-off');
+      break;
+  }
+  cell.appendChild(event);
+}
+
+// La variable API_BASE_URL est définie dans script.js
 
 // Initialisation du module lorsque le DOM est chargé
 document.addEventListener('DOMContentLoaded', initPlanningModule);
