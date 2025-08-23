@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emploi du Temps - Infirmiers</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/date-headers.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -60,14 +63,13 @@
       <section class="calendrier-section">
         <div class="calendar-header">
           <div class="calendar-nav">
-            <button id="prev-month" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+            <button id="prev-week" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
             <button id="today-btn" class="nav-btn primary-btn">Aujourd'hui</button>
-            <button id="next-month" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+            <button id="next-week" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+            <button id="select-week" class="nav-btn"><i class="fas fa-calendar-alt"></i> Sélectionner</button>
           </div>
-          <h3 id="current-month"></h3>
           <h3 id="current-week">Semaine du 18 au 22 août 2025</h3>
         </div>
-        <div id="calendar-days" class="calendar-grid"></div>
 
         <!-- Tableau d'emploi du temps hebdomadaire -->
         <div class="schedule-table-container">
@@ -255,6 +257,22 @@
           </label>
         </div>
         <button type="submit" class="btn">Ajouter</button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Modal pour sélectionner une semaine -->
+  <div id="week-select-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3>Sélectionner une semaine</h3>
+      <form id="week-select-form">
+        <div class="form-group">
+          <label for="week-date-select">Choisissez une date dans la semaine désirée:</label>
+          <input type="date" id="week-date-select" required>
+          <p class="form-hint">La semaine complète contenant cette date sera affichée.</p>
+        </div>
+        <button type="submit" class="btn">Afficher cette semaine</button>
       </form>
     </div>
   </div>

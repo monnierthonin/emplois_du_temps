@@ -49,6 +49,42 @@ function setupWeekNavigation() {
       setCurrentWeek(getCurrentWeekStart());
     });
   }
+  
+  // Bouton sélectionner une semaine
+  const selectWeekBtn = document.getElementById('select-week');
+  if (selectWeekBtn) {
+    selectWeekBtn.addEventListener('click', () => {
+      openWeekSelectModal();
+    });
+  }
+  
+  // Configuration du formulaire de sélection de semaine
+  const weekSelectForm = document.getElementById('week-select-form');
+  if (weekSelectForm) {
+    weekSelectForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const selectedDate = new Date(document.getElementById('week-date-select').value);
+      const weekStart = getWeekStartFromDate(selectedDate);
+      setCurrentWeek(weekStart);
+      closeWeekSelectModal();
+    });
+  }
+  
+  // Fermeture du modal de sélection de semaine
+  const closeButtons = document.querySelectorAll('#week-select-modal .close');
+  closeButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      closeWeekSelectModal();
+    });
+  });
+  
+  // Fermeture du modal en cliquant à l'extérieur
+  window.addEventListener('click', (e) => {
+    const modal = document.getElementById('week-select-modal');
+    if (e.target === modal) {
+      closeWeekSelectModal();
+    }
+  });
 }
 
 /**
@@ -57,19 +93,55 @@ function setupWeekNavigation() {
  */
 function getCurrentWeekStart() {
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = dimanche, 1 = lundi, ..., 6 = samedi
+  return getWeekStartFromDate(today);
+}
+
+/**
+ * Calcule le premier jour (lundi) de la semaine contenant la date spécifiée
+ * @param {Date} date - Une date quelconque dans la semaine
+ * @returns {Date} Date du lundi de cette semaine
+ */
+function getWeekStartFromDate(date) {
+  const dayOfWeek = date.getDay(); // 0 = dimanche, 1 = lundi, ..., 6 = samedi
   
   // Calcul du jour de début de semaine (lundi)
   const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Transformer 0-6 en "jours depuis lundi"
   
-  // Créer une nouvelle date pour le lundi de la semaine courante
-  const mondayDate = new Date(today);
-  mondayDate.setDate(today.getDate() - diff);
+  // Créer une nouvelle date pour le lundi de la semaine
+  const mondayDate = new Date(date);
+  mondayDate.setDate(date.getDate() - diff);
   
   // Réinitialiser l'heure à minuit
   mondayDate.setHours(0, 0, 0, 0);
   
   return mondayDate;
+}
+
+/**
+ * Ouvre le modal de sélection de semaine
+ */
+function openWeekSelectModal() {
+  // Pré-remplir avec la date actuelle au format YYYY-MM-DD
+  const dateInput = document.getElementById('week-date-select');
+  const today = new Date();
+  const dateString = today.toISOString().split('T')[0]; // Format YYYY-MM-DD
+  dateInput.value = dateString;
+  
+  // Afficher le modal
+  const modal = document.getElementById('week-select-modal');
+  if (modal) {
+    modal.style.display = 'block';
+  }
+}
+
+/**
+ * Ferme le modal de sélection de semaine
+ */
+function closeWeekSelectModal() {
+  const modal = document.getElementById('week-select-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
 }
 
 /**
@@ -115,6 +187,32 @@ function updateWeekTitle(weekStart) {
   }
   
   document.getElementById('current-week').textContent = titleText;
+  
+  // Mise à jour des en-têtes du tableau avec les dates
+  updateTableHeadersWithDates(weekStart);
+}
+
+/**
+ * Met à jour les en-têtes du tableau avec les dates des jours
+ * @param {Date} weekStart - Date du début de semaine
+ */
+function updateTableHeadersWithDates(weekStart) {
+  // Sélectionner toutes les en-têtes de jours (colonnes 1 à 5)
+  const headers = document.querySelectorAll('#schedule-table thead th:not(.room-header)');
+  
+  // Pour chaque en-tête (Lundi à Vendredi)
+  headers.forEach((header, index) => {
+    // Calculer la date pour ce jour
+    const dayDate = new Date(weekStart);
+    dayDate.setDate(weekStart.getDate() + index);
+    
+    // Formater la date (jour et mois)
+    const day = dayDate.getDate();
+    const month = dayDate.getMonth() + 1; // Les mois commencent à 0
+    
+    // Mettre à jour le texte de l'en-tête avec le jour et la date
+    header.innerHTML = `${DAYS_OF_WEEK[index]}<br><span class="date-info">${day}/${month}</span>`;
+  });
 }
 
 /**

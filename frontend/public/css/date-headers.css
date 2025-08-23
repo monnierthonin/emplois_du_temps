@@ -1,0 +1,68 @@
+/* Styles pour les dates dans l'en-tête du tableau d'emploi du temps */
+.date-info {
+    display: block;
+    font-size: 0.85em;
+    font-weight: normal;
+    color: #555;
+    margin-top: 4px;
+}
+
+/* Style pour le bouton de sélection de semaine */
+#select-week {
+    margin-left: 10px;
+    background-color: #f5f5f5;
+    border: 1px solid #ccc;
+}
+
+#select-week:hover {
+    background-color: #e5e5e5;
+}
+
+.form-hint {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 5px;
+    font-style: italic;
+}
+
+/* Styles pour fixer la hauteur et ajouter le défilement */
+.container {
+    height: 100vh; /* Hauteur fixe égale à la hauteur de la fenêtre */
+    overflow: hidden; /* Évite tout débordement au niveau du conteneur principal */
+}
+
+.left-section, .right-section {
+    height: calc(100vh - 120px); /* Hauteur fixe moins l'espace pour le header et footer */
+    overflow: hidden; /* Évite le défilement global */
+}
+
+.calendrier-section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.calendar-header {
+    flex: 0 0 auto; /* Ne rétrécit pas, ne grandit pas */
+}
+
+.schedule-table-container {
+    flex: 1; /* Prend tout l'espace restant */
+    overflow-y: auto; /* Ajoute une barre de défilement vertical si nécessaire */
+    min-height: 0; /* Permet à flex de réduire la taille en dessous de la taille du contenu */
+}
+
+.schedule-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--primary-color); /* Assurez-vous que le fond est opaque */
+}
+
+.room-cell {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background-color: white; /* Fond opaque pour masquer le contenu derrière */
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05); /* Légère ombre pour une meilleure séparation visuelle */
+}
