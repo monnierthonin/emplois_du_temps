@@ -272,15 +272,35 @@ async function loadWeekData(weekStartDate) {
     if (data && data.length > 0) {
       data.forEach(item => {
         // Date de l'événement (format YYYY-MM-DD attendu dans la réponse API)
-        const eventDate = new Date(item.date);
-        
-        // Trouver la cellule correspondant à cette date
         const dateStr = item.date;
-        const cell = document.querySelector(`.schedule-cell[data-date="${dateStr}"]`);
         
-        if (cell) {
-          // Ajouter un événement visuel pour chaque service
-          addEventToCell(cell, item.prenom, item.service);
+        // Pour chaque salle, vérifier si un infirmier est assigné
+        const salles = ['salle16', 'salle17', 'salle18', 'salle19', 'salle20', 'salle21', 
+                       'salle22', 'salle23', 'salle24', 'reveil1', 'reveil2', 'perinduction'];
+        
+        // Vérifier si nous avons des infos d'infirmier
+        if (item.infirmiers_info) {
+          salles.forEach(salle => {
+            // Si un infirmier est assigné à cette salle
+            if (item.infirmiers_info[salle]) {
+              const infirmier = item.infirmiers_info[salle];
+              const salleNum = salle.replace('salle', ''); // Extraire le numéro de salle (16, 17, etc.)
+              
+              // Trouver la cellule correspondant à cette date et cette salle
+              const cell = document.querySelector(`.schedule-cell[data-date="${dateStr}"][data-room="${salle}"]`);
+              
+              if (cell) {
+                // Ajouter l'infirmier à la cellule
+                addInfirmierToCell(cell, infirmier);
+              }
+            }
+          });
+        } else {
+          // Ancienne méthode (maintenir la compatibilité)
+          const cell = document.querySelector(`.schedule-cell[data-date="${dateStr}"]`);
+          if (cell) {
+            addEventToCell(cell, item.prenom, item.service);
+          }
         }
       });
     }
@@ -324,6 +344,242 @@ function addEventToCell(cell, name, service) {
       break;
   }
   cell.appendChild(event);
+}
+
+/**
+ * Ajoute les informations d'un infirmier à une cellule du planning
+ * @param {HTMLElement} cell - Cellule du planning
+ * @param {Object} infirmier - Objet contenant les informations de l'infirmier
+ */
+function addInfirmierToCell(cell, infirmier) {
+  // Nettoyer la cellule des événements existants
+  const existingEvents = cell.querySelectorAll('.event');
+  existingEvents.forEach(event => event.remove());
+  
+  // Créer un conteneur pour l'infirmier et le bouton de suppression
+  const container = document.createElement('div');
+  container.className = 'event assigned-infirmier';
+  
+  // Rendre l'élément draggable pour permettre le déplacement
+  container.setAttribute('draggable', 'true');
+  
+  // Ajouter des styles spécifiques au conteneur
+  container.style.backgroundColor = '#a3c1ad'; // Couleur de fond légère
+  container.style.color = '#333'; // Couleur du texte foncée pour la lisibilité
+  container.style.padding = '2px 5px';
+  container.style.borderRadius = '3px';
+  container.style.fontSize = '0.9em';
+  container.style.fontWeight = 'bold';
+  container.style.display = 'flex';
+  container.style.justifyContent = 'space-between';
+  container.style.alignItems = 'center';
+  container.style.cursor = 'grab'; // Curseur indiquant que l'élément est déplaçable
+  
+  // Stocker les informations de l'infirmier comme attributs data pour référence future
+  container.dataset.infirmierId = infirmier.id;
+  container.dataset.infirmierNom = infirmier.nom;
+  container.dataset.infirmierPrenom = infirmier.prenom;
+  
+  // Créer l'élément pour le nom de l'infirmier
+  const nameElement = document.createElement('span');
+  nameElement.textContent = `${infirmier.prenom} ${infirmier.nom}`;
+  container.appendChild(nameElement);
+  
+  // Créer le bouton de suppression
+  const deleteButton = document.createElement('button');
+  deleteButton.textContent = 'X';
+  deleteButton.style.marginLeft = '5px';
+  deleteButton.style.background = 'none';
+  deleteButton.style.border = 'none';
+  deleteButton.style.color = '#555';
+  deleteButton.style.fontWeight = 'bold';
+  deleteButton.style.cursor = 'pointer';
+  deleteButton.style.fontSize = '0.8em';
+  deleteButton.style.padding = '0px 3px';
+  deleteButton.title = 'Retirer l\'infirmier de cette salle';
+  
+  // Ajouter l'événement de clic pour supprimer l'infirmier
+  deleteButton.addEventListener('click', function(e) {
+    e.stopPropagation(); // Éviter la propagation du clic
+    
+    // Récupérer la date et la salle
+    const cell = this.closest('.schedule-cell');
+    const date = cell.getAttribute('data-date');
+    const room = cell.getAttribute('data-room');
+    
+    if (date && room) {
+      // Appeler l'API pour retirer l'infirmier de cette salle
+      removeInfirmierFromCell(date, room, cell);
+    }
+  });
+  
+  container.appendChild(deleteButton);
+  
+  // Ajouter les événements de drag pour le conteneur
+  container.addEventListener('dragstart', handleInfirmierDragStart);
+  container.addEventListener('dragend', handleInfirmierDragEnd);
+  
+  // Ajouter à la cellule
+  cell.appendChild(container);
+}
+
+/**
+ * Retire un infirmier d'une cellule du planning
+ * @param {string} date - La date de la cellule (YYYY-MM-DD)
+ * @param {string} room - La salle concernée
+ * @param {HTMLElement} cell - La cellule du planning
+ */
+async function removeInfirmierFromCell(date, room, cell) {
+  try {
+    // Afficher un indicateur de chargement
+    cell.classList.add('loading');
+    
+    // Appeler l'API pour retirer l'infirmier
+    const response = await fetch(`${API_BASE_URL}/reset-assignment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        date: date,
+        salle: room
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    
+    // Réponse de l'API réussie
+    const result = await response.json();
+    
+    // Nettoyer la cellule
+    const existingEvents = cell.querySelectorAll('.event');
+    existingEvents.forEach(event => event.remove());
+    
+    // Recharger les données de la semaine pour mettre à jour tout l'affichage
+    if (currentWeekStart) {
+      loadWeekData(currentWeekStart);
+    }
+    
+    console.log('Infirmier retiré avec succès');
+    
+  } catch (error) {
+    console.error('Erreur lors du retrait de l\'infirmier:', error);
+    alert('Erreur lors du retrait de l\'infirmier. Veuillez réessayer.');
+  } finally {
+    // Retirer l'indicateur de chargement
+    cell.classList.remove('loading');
+  }
+}
+
+/**
+ * Gère le début du drag pour un infirmier déjà placé dans l'emploi du temps
+ * @param {DragEvent} e - L'événement de drag
+ */
+function handleInfirmierDragStart(e) {
+  // Stocker les informations de l'infirmier et de la cellule d'origine
+  const infirmierId = this.dataset.infirmierId;
+  const infirmierNom = this.dataset.infirmierNom;
+  const infirmierPrenom = this.dataset.infirmierPrenom;
+  
+  // Récupérer les informations de la cellule d'origine
+  const sourceCell = this.closest('.schedule-cell');
+  const sourceDate = sourceCell.getAttribute('data-date');
+  const sourceRoom = sourceCell.getAttribute('data-room');
+  
+  // Stocker les données pour le transfert
+  const transferData = {
+    id: infirmierId,
+    nom: infirmierNom,
+    prenom: infirmierPrenom,
+    sourceDate: sourceDate,
+    sourceRoom: sourceRoom,
+    isFromCell: true // Indique que l'infirmier vient d'une cellule et non de la liste
+  };
+  
+  e.dataTransfer.setData('text/plain', JSON.stringify(transferData));
+  
+  // Ajouter une classe pour indiquer que l'élément est en cours de glissement
+  this.classList.add('dragging');
+  
+  // Changer le style du curseur pendant le drag
+  document.body.style.cursor = 'grabbing';
+}
+
+/**
+ * Gère la fin du drag pour un infirmier déjà placé
+ * @param {DragEvent} e - L'événement de drag
+ */
+function handleInfirmierDragEnd(e) {
+  // Retirer la classe de glissement
+  this.classList.remove('dragging');
+  
+  // Rétablir le style du curseur
+  document.body.style.cursor = 'default';
+}
+
+/**
+ * Gère le déplacement d'un infirmier d'une cellule à une autre
+ * @param {Object} infirmierData - Données de l'infirmier
+ * @param {HTMLElement} targetCell - La cellule de destination
+ * @param {string} targetDate - Date de la cellule de destination
+ * @param {string} targetRoom - Salle de la cellule de destination
+ * @param {string} sourceDate - Date de la cellule d'origine
+ * @param {string} sourceRoom - Salle de la cellule d'origine
+ */
+async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, targetRoom, sourceDate, sourceRoom) {
+  try {
+    // Afficher un indicateur de chargement sur les deux cellules
+    targetCell.classList.add('loading');
+    
+    // Étape 1: Supprimer l'infirmier de la cellule d'origine
+    const resetResponse = await fetch(`${API_BASE_URL}/reset-assignment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        date: sourceDate,
+        salle: sourceRoom
+      })
+    });
+    
+    if (!resetResponse.ok) {
+      throw new Error(`Erreur HTTP lors de la suppression: ${resetResponse.status}`);
+    }
+    
+    // Étape 2: Assigner l'infirmier à la nouvelle cellule
+    const assignResponse = await fetch(`${API_BASE_URL}/assign-infirmier`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        infirmierId: infirmierData.id,
+        date: targetDate,
+        salle: targetRoom
+      })
+    });
+    
+    if (!assignResponse.ok) {
+      throw new Error(`Erreur HTTP lors de l'assignation: ${assignResponse.status}`);
+    }
+    
+    // Recharger les données de la semaine pour mettre à jour tout l'affichage
+    if (currentWeekStart) {
+      loadWeekData(currentWeekStart);
+    }
+    
+    console.log('Infirmier déplacé avec succès');
+    
+  } catch (error) {
+    console.error('Erreur lors du déplacement de l\'infirmier:', error);
+    alert('Erreur lors du déplacement de l\'infirmier. Veuillez réessayer.');
+  } finally {
+    // Retirer les indicateurs de chargement
+    targetCell.classList.remove('loading');
+  }
 }
 
 // La variable API_BASE_URL est définie dans script.js

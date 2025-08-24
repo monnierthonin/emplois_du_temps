@@ -55,7 +55,7 @@
 .schedule-table thead th {
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 5;
     background-color: var(--primary-color); /* Assurez-vous que le fond est opaque */
 }
 
@@ -65,4 +65,13 @@
     z-index: 5;
     background-color: white; /* Fond opaque pour masquer le contenu derrière */
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05); /* Légère ombre pour une meilleure séparation visuelle */
+}
+
+/* Styles pour assurer que les modals apparaissent au premier plan */
+.modal {
+    z-index: 1000 !important; /* Valeur élevée pour s'assurer qu'il est au-dessus de tout */
+}
+
+.modal-content {
+    z-index: 1001 !important; /* Encore plus élevé que le modal lui-même */
 }
