@@ -245,3 +245,150 @@ function markInfirmierAsAssigned(infirmierId) {
     infirmierItem.classList.add('assigned');
   }
 }
+
+/**
+ * Déplace un infirmier d'une cellule à une autre
+ * @param {Object} infirmierData - Données de l'infirmier
+ * @param {HTMLElement} targetCell - Cellule de destination
+ * @param {string} targetDate - Date de destination
+ * @param {string} targetRoom - Salle de destination
+ * @param {string} sourceDate - Date d'origine
+ * @param {string} sourceRoom - Salle d'origine
+ */
+async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, targetRoom, sourceDate, sourceRoom) {
+  try {
+    // 1. Vérifier la disponibilité de l'infirmier à la date cible, en excluant la salle source
+    if (sourceDate === targetDate && sourceRoom !== targetRoom) {
+      const availabilityResponse = await fetch(
+        `${API_BASE_URL}/check-nurse-availability?infirmier_id=${infirmierData.id}&date=${targetDate}&current_room=${sourceRoom}`
+      );
+
+      if (!availabilityResponse.ok) {
+        throw new Error(`Erreur HTTP: ${availabilityResponse.status}`);
+      }
+
+      const availabilityData = await availabilityResponse.json();
+      
+      // Si l'infirmier n'est pas disponible à cette date (déjà assigné ailleurs)
+      if (!availabilityData.available && availabilityData.assigned_room !== sourceRoom) {
+        alert(`Cet infirmier est déjà assigné à la salle ${availabilityData.assigned_room} ce jour-là.`);
+        return;
+      }
+    }
+    
+    // 2. Supprimer l'infirmier de la salle d'origine
+    await fetch(`${API_BASE_URL}/assign-infirmier`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        infirmierId: 0, // 0 signifie supprimer
+        date: sourceDate,
+        salle: sourceRoom
+      })
+    });
+
+    // 3. Assigner l'infirmier à la nouvelle salle
+    await fetch(`${API_BASE_URL}/assign-infirmier`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        infirmierId: infirmierData.id,
+        date: targetDate,
+        salle: targetRoom
+      })
+    });
+
+    // 4. Mettre à jour l'affichage visuel
+    updateVisualAssignment(infirmierData, targetCell);
+
+    // 5. Supprimer l'affichage visuel de la salle d'origine
+    const sourceCell = document.querySelector(`.schedule-cell[data-date="${sourceDate}"][data-room="${sourceRoom}"]`);
+    if (sourceCell) {
+      const existingEvents = sourceCell.querySelectorAll('.event');
+      existingEvents.forEach(event => event.remove());
+    }
+
+    // 6. Recharger les données de la semaine pour mettre à jour tout l'affichage
+    if (currentWeekStart) {
+      loadWeekData(currentWeekStart);
+    }
+
+  } catch (error) {
+    console.error('Erreur lors du déplacement de l\'infirmier:', error);
+    alert('Erreur lors du déplacement de l\'infirmier. Veuillez réessayer.');
+  }
+}
+
+/**
+ * Vérifie si un infirmier est disponible à une date donnée
+ * @param {number} infirmierId - ID de l'infirmier
+ * @param {string} date - Date à vérifier
+ * @param {string|null} currentRoom - Salle actuelle à exclure (optionnel)
+ * @returns {Promise<Object>} - Objet avec available (boolean) et assigned_room (string|null)
+ */
+async function checkNurseAvailability(infirmierId, date, currentRoom = null) {
+  try {
+    let url = `${API_BASE_URL}/check-nurse-availability?infirmier_id=${infirmierId}&date=${date}`;
+    if (currentRoom) {
+      url += `&current_room=${currentRoom}`;
+    }
+
+    console.log(`Vérification de disponibilité: ${url}`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors de la vérification de disponibilité:', error);
+    throw error;
+  }
+}
+
+/**
+ * Marque toutes les cellules où un infirmier est déjà assigné comme indisponibles
+ * @param {number} infirmierId - ID de l'infirmier
+ * @param {string|null} sourceDate - Date de la cellule source (optionnel, pour permettre le déplacement)
+ * @param {string|null} sourceRoom - Salle de la cellule source (optionnel, pour permettre le déplacement)
+ */
+async function markUnavailableDays(infirmierId, sourceDate = null, sourceRoom = null) {
+  try {
+    // D'abord, réinitialiser toutes les cellules (supprimer la classe nurse-unavailable)
+    document.querySelectorAll('.schedule-cell').forEach(cell => {
+      cell.classList.remove('nurse-unavailable');
+    });
+
+    // Pour chaque jour dans le planning actuellement affiché
+    const cells = document.querySelectorAll('.schedule-cell[data-date]');
+    const uniqueDates = new Set([...cells].map(cell => cell.getAttribute('data-date')));
+
+    console.log(`Vérification de disponibilité pour ${uniqueDates.size} dates`);
+
+    // Pour chaque date, vérifier si l'infirmier est déjà assigné
+    for (const date of uniqueDates) {
+      const availability = await checkNurseAvailability(infirmierId, date, 
+        (date === sourceDate) ? sourceRoom : null);
+
+      if (!availability.available) {
+        // Marquer toutes les cellules de ce jour comme indisponibles, sauf la cellule source
+        document.querySelectorAll(`.schedule-cell[data-date="${date}"]`).forEach(cell => {
+          const cellRoom = cell.getAttribute('data-room');
+          // Ne pas marquer la cellule source comme indisponible
+          if (!(date === sourceDate && cellRoom === sourceRoom)) {
+            cell.classList.add('nurse-unavailable');
+          }
+        });
+
+        console.log(`Infirmier ${infirmierId} déjà assigné le ${date} à ${availability.assigned_room}`);
+      }
+    }
+  } catch (error) {
+    console.error('Erreur lors du marquage des jours indisponibles:', error);
+  }
+}
