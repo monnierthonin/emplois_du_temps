@@ -3,6 +3,16 @@
  * Permet de faire glisser un infirmier de la liste vers une case de l'emploi du temps
  */
 
+// Référence à la fonction showMessage définie dans infirmiers.js
+// Si la fonction n'est pas disponible, en créer une version simplifiée
+if (typeof showMessage !== 'function') {
+  // Fonction de repli si showMessage n'est pas définie ailleurs
+  function showMessage(message, type = 'info') {
+    console.log(`Message (${type}): ${message}`);
+    alert(message);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   initDragAndDrop();
 });
@@ -19,31 +29,49 @@ function initDragAndDrop() {
  * Configure les éléments de la liste des infirmiers pour être glissables
  */
 function setupDraggableInfirmiers() {
-  // On attend que les infirmiers soient chargés dans la liste
+  // Observer pour surveiller en continu les modifications de la liste des infirmiers
   const observer = new MutationObserver(function(mutations) {
-    const infirmiersList = document.getElementById('infirmiers-list');
-    if (infirmiersList && infirmiersList.children.length > 0) {
-      const infirmierItems = infirmiersList.querySelectorAll('li');
-      
-      infirmierItems.forEach(item => {
-        // Déjà configuré? Skip
-        if (item.getAttribute('draggable') === 'true') return;
-        
-        // Rendre l'élément glissable
-        item.setAttribute('draggable', 'true');
-        
-        // Événements de glisser-déposer
-        item.addEventListener('dragstart', handleDragStart);
-        item.addEventListener('dragend', handleDragEnd);
-      });
-      
-      // Une fois configuré, on peut arrêter d'observer
-      observer.disconnect();
-    }
+    mutations.forEach(mutation => {
+      // Vérifier si des nœuds ont été ajoutés
+      if (mutation.addedNodes.length > 0) {
+        const infirmiersList = document.getElementById('infirmiers-list');
+        if (infirmiersList && infirmiersList.children.length > 0) {
+          // Uniquement configurer les nouveaux éléments
+          const infirmierItems = infirmiersList.querySelectorAll('li:not([draggable="true"])');
+          
+          infirmierItems.forEach(item => {
+            console.log('Configuration d\'un nouvel élément draggable:', item.dataset.id);
+            
+            // Rendre l'élément glissable
+            item.setAttribute('draggable', 'true');
+            
+            // Événements de glisser-déposer
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragend', handleDragEnd);
+          });
+        }
+      }
+    });
   });
   
-  // Observer le DOM pour détecter quand les infirmiers sont ajoutés
+  // Observer le DOM pour détecter quand les infirmiers sont ajoutés ou modifiés
   observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Configuration initiale pour les éléments existants
+  const infirmiersList = document.getElementById('infirmiers-list');
+  if (infirmiersList) {
+    const infirmierItems = infirmiersList.querySelectorAll('li:not([draggable="true"])');
+    infirmierItems.forEach(item => {
+      console.log('Configuration initiale d\'un élément draggable:', item.dataset.id);
+      
+      // Rendre l'élément glissable
+      item.setAttribute('draggable', 'true');
+      
+      // Événements de glisser-déposer
+      item.addEventListener('dragstart', handleDragStart);
+      item.addEventListener('dragend', handleDragEnd);
+    });
+  }
 }
 
 /**
@@ -66,19 +94,37 @@ function setupDroppableScheduleCells() {
  * @param {DragEvent} e - L'événement de drag
  */
 function handleDragStart(e) {
-  // Stocker l'ID de l'infirmier et son nom pour le transfert
-  const infirmierId = this.getAttribute('data-id');
-  const infirmierNom = this.getAttribute('data-nom');
-  const infirmierPrenom = this.getAttribute('data-prenom');
+  // Récupérer les données de l'infirmier depuis dataset (accès moderne aux attributs data-*)
+  const infirmierId = this.dataset.id;
+  const infirmierNom = this.dataset.nom;
+  const infirmierPrenom = this.dataset.prenom;
   
+  console.log('Début de drag:', { infirmierId, infirmierNom, infirmierPrenom });
+  
+  // Vérifier que les données sont présentes
+  if (!infirmierId || !infirmierNom || !infirmierPrenom) {
+    console.error('Données infirmier manquantes:', this);
+    // Afficher un message visuel pour le débogage
+    const errorMsg = `Erreur: données manquantes - ID: ${infirmierId}, Nom: ${infirmierNom}, Prénom: ${infirmierPrenom}`;
+    showMessage(errorMsg, 'error');
+    return;
+  }
+  
+  // Définir les données de transfert
   e.dataTransfer.setData('text/plain', JSON.stringify({
     id: infirmierId,
     nom: infirmierNom,
     prenom: infirmierPrenom
   }));
   
+  // Définir une image de drag (optionnel)
+  e.dataTransfer.effectAllowed = 'move';
+  
   // Ajouter une classe pour indiquer que l'élément est en cours de glissement
   this.classList.add('dragging');
+  
+  // Changer le style du curseur
+  document.body.style.cursor = 'grabbing';
 }
 
 /**
@@ -88,6 +134,11 @@ function handleDragStart(e) {
 function handleDragEnd(e) {
   // Retirer la classe de glissement
   this.classList.remove('dragging');
+  
+  // Restaurer le style du curseur
+  document.body.style.cursor = 'default';
+  
+  console.log('Fin de drag');
 }
 
 /**
@@ -95,6 +146,13 @@ function handleDragEnd(e) {
  * @param {DragEvent} e - L'événement de drag
  */
 function handleDragOver(e) {
+  // Vérifier si la salle est fermée ou non utilisée
+  if (this.classList.contains('room-close') || this.classList.contains('room-unuse')) {
+    // Ne pas autoriser le drop sur les salles fermées ou non utilisées
+    this.classList.add('drag-not-allowed');
+    return; // Ne pas appeler preventDefault() pour empêcher le drop
+  }
+  
   // Autoriser le drop
   e.preventDefault();
   
@@ -107,8 +165,8 @@ function handleDragOver(e) {
  * @param {DragEvent} e - L'événement de drag
  */
 function handleDragLeave(e) {
-  // Retirer la classe de survol
-  this.classList.remove('drag-over');
+  // Retirer les classes de survol
+  this.classList.remove('drag-over', 'drag-not-allowed');
 }
 
 /**
@@ -118,46 +176,77 @@ function handleDragLeave(e) {
 function handleDrop(e) {
   e.preventDefault();
   
-  // Retirer la classe de survol
-  this.classList.remove('drag-over');
+  // Retirer les classes de survol
+  this.classList.remove('drag-over', 'drag-not-allowed');
   
-  // Récupérer les données de l'infirmier
-  const infirmierData = JSON.parse(e.dataTransfer.getData('text/plain'));
-  
-  // Récupérer les informations de la cellule de destination
-  const targetDate = this.getAttribute('data-date');
-  const targetRoom = this.getAttribute('data-room');
-  const targetDay = this.getAttribute('data-day');
-  
-  if (!targetDate || !targetRoom) {
-    console.error('Information manquante sur la cellule:', { targetDate, targetRoom });
+  // Vérifier si la salle est fermée ou non utilisée
+  if (this.classList.contains('room-close') || this.classList.contains('room-unuse')) {
+    const roomState = this.classList.contains('room-close') ? 'fermée' : 'non utilisée';
+    showMessage(`Impossible d'assigner un infirmier à une salle ${roomState}`, 'error');
     return;
   }
   
-  // Vérifier si l'infirmier vient d'une autre cellule ou de la liste
-  if (infirmierData.isFromCell) {
-    // Cas où l'infirmier est déplacé d'une cellule à une autre
-    const sourceDate = infirmierData.sourceDate;
-    const sourceRoom = infirmierData.sourceRoom;
-    
-    // Si c'est la même cellule, ne rien faire
-    if (sourceDate === targetDate && sourceRoom === targetRoom) {
-      console.log('Même cellule, aucune action nécessaire');
-      return;
+  try {
+    // Récupérer les données de l'infirmier
+    const rawData = e.dataTransfer.getData('text/plain');
+    if (!rawData) {
+      throw new Error('Aucune donnée reçue lors du drop');
     }
     
-    // Déplacer l'infirmier entre les cellules
-    moveInfirmierBetweenCells(
-      infirmierData,
-      this,
-      targetDate,
-      targetRoom,
-      sourceDate,
-      sourceRoom
-    );
-  } else {
-    // Cas classique: l'infirmier vient de la liste
-    assignInfirmierToCell(infirmierData, this, targetDate, targetRoom);
+    console.log('Données reçues lors du drop:', rawData);
+    const infirmierData = JSON.parse(rawData);
+    
+    // Vérifier que les données essentielles sont présentes
+    if (!infirmierData.id) {
+      throw new Error('Données infirmier incomplètes');
+    }
+    
+    // Récupérer les informations de la cellule de destination
+    const targetDate = this.getAttribute('data-date');
+    const targetRoom = this.getAttribute('data-room');
+    const targetDay = this.getAttribute('data-day');
+    
+    if (!targetDate || !targetRoom) {
+      throw new Error(`Information manquante sur la cellule: date=${targetDate}, salle=${targetRoom}`);
+    }
+    
+    console.log('Drop sur cellule:', { targetDate, targetRoom, targetDay });
+    console.log('Données infirmier:', infirmierData);
+    
+    // Vérifier si l'infirmier vient d'une autre cellule ou de la liste
+    if (infirmierData.isFromCell) {
+      // Cas où l'infirmier est déplacé d'une cellule à une autre
+      const sourceDate = infirmierData.sourceDate;
+      const sourceRoom = infirmierData.sourceRoom;
+      
+      // Si c'est la même cellule, ne rien faire
+      if (sourceDate === targetDate && sourceRoom === targetRoom) {
+        console.log('Même cellule, aucune action nécessaire');
+        return;
+      }
+      
+      // Déplacer l'infirmier entre les cellules
+      moveInfirmierBetweenCells(
+        infirmierData,
+        this,
+        targetDate,
+        targetRoom,
+        sourceDate,
+        sourceRoom
+      );
+    } else {
+      // Cas classique: l'infirmier vient de la liste
+      assignInfirmierToCell(infirmierData, this, targetDate, targetRoom);
+    }
+  } catch (error) {
+    console.error('Erreur lors du drop:', error);
+    showMessage(`Erreur lors du glisser-déposer: ${error.message}`, 'error');
+    
+    // Restaurer l'apparence normale de la cellule
+    this.classList.remove('loading');
+  } finally {
+    // Restaurer le curseur
+    document.body.style.cursor = 'default';
   }
 }
 

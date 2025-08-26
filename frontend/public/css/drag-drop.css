@@ -47,3 +47,13 @@
     font-size: 0.9em;
     font-weight: normal;
 }
+
+/* Style pour les cellules avec infirmiers en double */
+.schedule-cell.doublon {
+    background-color: rgba(255, 0, 0, 0.15);
+}
+
+.schedule-cell.doublon .event {
+    border-left: 3px solid #ff0000;
+    background-color: rgba(255, 220, 220, 0.7);
+}

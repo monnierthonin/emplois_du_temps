@@ -247,6 +247,101 @@ footer {
   cursor: pointer;
 }
 
+/* États des salles */
+.schedule-cell.room-close {
+  background-color: #333333;
+  color: white;
+}
+
+.schedule-cell.room-unuse {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+/* Boutons de contrôle des états de salle */
+.room-state-controls {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: none;
+  flex-direction: row;
+  gap: 5px;
+  z-index: 10;
+}
+
+/* Afficher les boutons uniquement au survol et seulement si aucun infirmier n'est assigné */
+.schedule-cell:hover .room-state-controls {
+  display: flex;
+}
+
+/* Cacher les boutons si un infirmier est assigné */
+.schedule-cell:has(.event) .room-state-controls {
+  display: none;
+}
+
+.room-state-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: white;
+  transition: transform 0.2s;
+}
+
+.room-state-btn:hover {
+  transform: scale(1.2);
+}
+
+.btn-open {
+  background-color: #ffffff;
+  border: 2px solid #28a745;
+  color: #28a745;
+}
+
+.btn-unuse {
+  background-color: #ffc107;
+  border: 1px solid #856404;
+}
+
+.btn-close {
+  background-color: #333333;
+  border: 1px solid #000;
+}
+
+/* Indication visuelle que la salle n'est pas disponible pour le drag & drop */
+.schedule-cell.room-close .event,
+.schedule-cell.room-unuse .event {
+  opacity: 0.5;
+}
+
+.schedule-cell.room-close::after,
+.schedule-cell.room-unuse::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.05) 75%, transparent 75%, transparent);
+  background-size: 10px 10px;
+  pointer-events: none;
+}
+
+/* Style pour cellule où le drop est interdit */
+.schedule-cell.drag-not-allowed {
+  cursor: not-allowed;
+  border: 2px dashed #e74c3c !important;
+  box-shadow: inset 0 0 5px rgba(231, 76, 60, 0.3);
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%23e74c3c' d='M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
 /* Navigation buttons */
 .calendar-header {
   display: flex;

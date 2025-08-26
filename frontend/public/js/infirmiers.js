@@ -152,6 +152,8 @@ function renderInfirmiersList() {
     const li = document.createElement('li');
     li.className = 'infirmier-item';
     li.dataset.id = infirmier.id;
+    li.dataset.nom = infirmier.nom;
+    li.dataset.prenom = infirmier.prenom;
     
     const statusClass = `status-${infirmier.status.replace('*', 'star').toLowerCase()}`;
     const presentClass = infirmier.present ? 'present' : 'absent';
@@ -228,8 +230,15 @@ async function deleteInfirmier(id) {
       method: 'DELETE',
     });
     
+    const data = await response.json();
+    
     if (!response.ok) {
-      throw new Error(`Erreur lors de la suppression: ${response.status}`);
+      // Si le backend a renvoyé un message d'erreur spécifique, l'afficher
+      if (data && data.error) {
+        throw new Error(data.error);
+      } else {
+        throw new Error(`Erreur lors de la suppression: ${response.status}`);
+      }
     }
     
     // Recharger la liste
@@ -238,7 +247,7 @@ async function deleteInfirmier(id) {
     
   } catch (error) {
     console.error('Erreur:', error);
-    showMessage('Erreur lors de la suppression', 'error');
+    showMessage(error.message || 'Erreur lors de la suppression', 'error');
   }
 }
 
@@ -254,11 +263,74 @@ function resetInfirmierForm() {
 }
 
 /**
- * Affiche un message à l'utilisateur
+ * Affiche un message à l'utilisateur dans une boîte de dialogue modale stylée
  */
 function showMessage(message, type = 'info') {
-  // Implémentation simple, à améliorer avec un vrai système de notification
-  alert(message);
+  // Vérifier si le conteneur de notification existe déjà
+  let notifContainer = document.getElementById('notification-container');
+  
+  // Créer le conteneur s'il n'existe pas
+  if (!notifContainer) {
+    notifContainer = document.createElement('div');
+    notifContainer.id = 'notification-container';
+    notifContainer.style.position = 'fixed';
+    notifContainer.style.top = '20px';
+    notifContainer.style.right = '20px';
+    notifContainer.style.zIndex = '10000';
+    document.body.appendChild(notifContainer);
+  }
+  
+  // Créer la notification
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.style.padding = '15px 20px';
+  notification.style.margin = '10px 0';
+  notification.style.borderRadius = '5px';
+  notification.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+  notification.style.opacity = '0';
+  notification.style.transition = 'opacity 0.3s ease';
+  
+  // Style selon le type de message
+  if (type === 'error') {
+    notification.style.backgroundColor = '#f8d7da';
+    notification.style.color = '#721c24';
+    notification.style.borderLeft = '4px solid #dc3545';
+  } else if (type === 'success') {
+    notification.style.backgroundColor = '#d4edda';
+    notification.style.color = '#155724';
+    notification.style.borderLeft = '4px solid #28a745';
+  } else {
+    notification.style.backgroundColor = '#cce5ff';
+    notification.style.color = '#004085';
+    notification.style.borderLeft = '4px solid #0d6efd';
+  }
+  
+  // Contenu du message
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div>${message}</div>
+      <button style="background: none; border: none; cursor: pointer; font-size: 16px; color: inherit;" 
+              onclick="this.parentNode.parentNode.remove();">×</button>
+    </div>
+  `;
+  
+  // Ajouter au conteneur et animer
+  notifContainer.appendChild(notification);
+  
+  // Animation d'apparition
+  setTimeout(() => {
+    notification.style.opacity = '1';
+  }, 10);
+  
+  // Auto-destruction après 6 secondes pour les messages de succès ou d'info
+  if (type !== 'error') {
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      setTimeout(() => {
+        notification.remove();
+      }, 300);
+    }, 6000);
+  }
 }
 
 // Initialisation du module quand le DOM est chargé

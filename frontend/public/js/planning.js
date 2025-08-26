@@ -15,6 +15,7 @@ let currentWeekStart = null;
  */
 function initPlanningModule() {
   setupWeekNavigation();
+  addRoomStateControlsToAllCells();
   setCurrentWeek(getCurrentWeekStart());
 }
 
@@ -241,6 +242,203 @@ function updateScheduleCellDates(weekStart) {
 }
 
 /**
+ * Ajoute les boutons de contrôle d'état de salle à toutes les cellules du planning
+ */
+function addRoomStateControlsToAllCells() {
+  const cells = document.querySelectorAll('.schedule-cell');
+  
+  cells.forEach(cell => {
+    // Créer le conteneur pour les boutons d'état
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'room-state-controls';
+    
+    // Bouton pour ouvrir la salle (état normal)
+    const openBtn = document.createElement('button');
+    openBtn.className = 'room-state-btn btn-open';
+    openBtn.innerHTML = '✓';
+    openBtn.title = 'Ouvrir la salle';
+    openBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleRoomStateChange(cell, null);
+    });
+    
+    // Bouton pour marquer comme "non utilisée"
+    const unuseBtn = document.createElement('button');
+    unuseBtn.className = 'room-state-btn btn-unuse';
+    unuseBtn.innerHTML = '!';
+    unuseBtn.title = 'Marquer comme non utilisée';
+    unuseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleRoomStateChange(cell, 'unuse');
+    });
+    
+    // Bouton pour fermer la salle
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'room-state-btn btn-close';
+    closeBtn.innerHTML = 'X';
+    closeBtn.title = 'Fermer la salle';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleRoomStateChange(cell, 'close');
+    });
+    
+    // Ajouter les boutons au conteneur
+    controlsContainer.appendChild(openBtn);
+    controlsContainer.appendChild(unuseBtn);
+    controlsContainer.appendChild(closeBtn);
+    
+    // Ajouter le conteneur à la cellule
+    cell.appendChild(controlsContainer);
+  });
+}
+
+/**
+ * Gère le changement d'état d'une salle
+ * @param {HTMLElement} cell - La cellule du planning
+ * @param {string|null} state - Le nouvel état ('close', 'unuse' ou null pour ouvert)
+ */
+async function handleRoomStateChange(cell, state) {
+  try {
+    const date = cell.getAttribute('data-date');
+    const room = cell.getAttribute('data-room');
+    
+    if (!date || !room) {
+      console.error('Impossible de déterminer la date ou la salle');
+      return;
+    }
+    
+    // Indication visuelle pendant le chargement
+    cell.classList.add('loading');
+    
+    // Appel à l'API pour mettre à jour l'état de la salle
+    const response = await fetch(`${API_BASE_URL}/salle-state`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        date: date,
+        salle: room,
+        state: state
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    // Mise à jour de l'UI avec le nouvel état
+    updateRoomStateUI(cell, state);
+    
+    // Si l'état est 'close' ou 'unuse', l'API aura déjà retiré l'infirmier de cette salle
+    // Recharger les données pour mettre à jour l'affichage
+    if (currentWeekStart) {
+      loadRoomStates(currentWeekStart);
+    }
+    
+    // Montrer un message de confirmation
+    const stateMsg = state ? (state === 'close' ? 'fermée' : 'marquée comme non utilisée') : 'ouverte';
+    showMessage(`Salle ${room} ${stateMsg} pour le ${formatDate(date)}`, 'success');
+    
+  } catch (error) {
+    console.error('Erreur lors du changement d\'état de la salle:', error);
+    showMessage('Erreur lors du changement d\'état de la salle. Veuillez réessayer.', 'error');
+  } finally {
+    cell.classList.remove('loading');
+  }
+}
+
+/**
+ * Met à jour l'UI d'une cellule en fonction de son état
+ * @param {HTMLElement} cell - La cellule du planning
+ * @param {string|null} state - L'état de la salle ('close', 'unuse' ou null)
+ */
+function updateRoomStateUI(cell, state) {
+  // Retirer les classes d'état existantes
+  cell.classList.remove('room-close', 'room-unuse');
+  
+  // Ajouter la classe appropriée en fonction de l'état
+  if (state === 'close') {
+    cell.classList.add('room-close');
+  } else if (state === 'unuse') {
+    cell.classList.add('room-unuse');
+  }
+}
+
+/**
+ * Charge les états des salles pour une période donnée
+ * @param {Date} weekStartDate - Date du début de semaine
+ */
+async function loadRoomStates(weekStartDate) {
+  try {
+    // Préparer les dates pour chaque jour de la semaine
+    const dates = [];
+    for (let i = 0; i < 5; i++) { // Du lundi au vendredi
+      const dayDate = new Date(weekStartDate);
+      dayDate.setDate(weekStartDate.getDate() + i);
+      dates.push(dayDate.toISOString().split('T')[0]); // Format YYYY-MM-DD
+    }
+    
+    // Récupérer les états des salles pour chaque jour
+    for (const date of dates) {
+      const response = await fetch(`${API_BASE_URL}/salle-states/${date}`);
+      
+      if (!response.ok) {
+        console.warn(`Impossible de récupérer les états des salles pour ${date}`);
+        continue;
+      }
+      
+      const data = await response.json();
+      
+      // Appliquer les états aux cellules correspondantes
+      if (data && data.states) {
+        const salles = Object.keys(data.states);
+        
+        salles.forEach(salle => {
+          const state = data.states[salle];
+          const cell = document.querySelector(`.schedule-cell[data-date="${date}"][data-room="${salle}"]`);
+          
+          if (cell) {
+            updateRoomStateUI(cell, state);
+          }
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.error('Erreur lors du chargement des états des salles:', error);
+  }
+}
+
+/**
+ * Formatte une date au format français
+ * @param {string} dateStr - Date au format YYYY-MM-DD
+ * @returns {string} Date au format DD/MM/YYYY
+ */
+function formatDate(dateStr) {
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Affiche un message à l'utilisateur
+ * @param {string} message - Le message à afficher
+ * @param {string} type - Type de message ('success', 'error', 'info')
+ */
+function showMessage(message, type = 'info') {
+  // Vérifier si la fonction existe déjà dans le contexte global
+  if (window.showMessage && typeof window.showMessage === 'function') {
+    window.showMessage(message, type);
+  } else {
+    // Implémentation de secours
+    alert(message);
+    console.log(`${type.toUpperCase()}: ${message}`);
+  }
+}
+
+/**
  * Charge les données de planning pour une semaine depuis l'API
  * @param {Date} weekStartDate - Date du début de semaine
  */
@@ -260,13 +458,16 @@ async function loadWeekData(weekStartDate) {
     // Effacer les événements existants
     clearEvents();
     
-    // Appel à l'API
+    // Appel à l'API pour les données d'emploi du temps
     const response = await fetch(apiUrl);
     if (!response.ok) {
       throw new Error(`Erreur HTTP: ${response.status}`);
     }
     
     const data = await response.json();
+    
+    // Charger également les états des salles
+    await loadRoomStates(weekStartDate);
     
     // Ajouter les événements au calendrier
     if (data && data.length > 0) {
@@ -280,6 +481,19 @@ async function loadWeekData(weekStartDate) {
         
         // Vérifier si nous avons des infos d'infirmier
         if (item.infirmiers_info) {
+          // Vérifier d'abord si des doublons sont identifiés dans la réponse API
+          const doublons = item.doublons || [];
+          
+          // Appliquer la classe doublon aux salles concernées
+          if (doublons.length > 0) {
+            doublons.forEach(salle => {
+              const doublonCell = document.querySelector(`.schedule-cell[data-date="${dateStr}"][data-room="${salle}"]`);
+              if (doublonCell) {
+                doublonCell.classList.add('doublon');
+              }
+            });
+          }
+          
           salles.forEach(salle => {
             // Si un infirmier est assigné à cette salle
             if (item.infirmiers_info[salle]) {
@@ -292,6 +506,18 @@ async function loadWeekData(weekStartDate) {
               if (cell) {
                 // Ajouter l'infirmier à la cellule
                 addInfirmierToCell(cell, infirmier);
+                
+                // Si cette salle est dans la liste des doublons, ajouter une info visuelle
+                if (doublons.includes(salle)) {
+                  const infoElement = document.createElement('div');
+                  infoElement.className = 'doublon-info';
+                  infoElement.textContent = '⚠️ Doublon';
+                  infoElement.title = 'Cet infirmier est affecté à plusieurs salles ce jour-là';
+                  infoElement.style.fontSize = '0.7em';
+                  infoElement.style.color = '#d32f2f';
+                  infoElement.style.marginTop = '2px';
+                  cell.appendChild(infoElement);
+                }
               }
             }
           });
@@ -312,10 +538,20 @@ async function loadWeekData(weekStartDate) {
 
 /**
  * Efface tous les événements affichés dans les cellules du planning
+ * et réinitialise les statuts de doublon
  */
 function clearEvents() {
+  // Supprimer tous les événements
   const eventElements = document.querySelectorAll('.schedule-cell .event');
   eventElements.forEach(event => event.remove());
+  
+  // Supprimer les indicateurs de doublon
+  const doublonInfoElements = document.querySelectorAll('.schedule-cell .doublon-info');
+  doublonInfoElements.forEach(info => info.remove());
+  
+  // Supprimer la classe doublon de toutes les cellules
+  const doublonCells = document.querySelectorAll('.schedule-cell.doublon');
+  doublonCells.forEach(cell => cell.classList.remove('doublon'));
 }
 
 /**
