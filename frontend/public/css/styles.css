@@ -269,14 +269,41 @@ footer {
   z-index: 10;
 }
 
+.header-controls {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 0;
+  display: flex; /* Toujours afficher les contrôles dans l'en-tête */
+  opacity: 0.7; /* Légèrement transparent par défaut */
+}
+
+.room-cell:hover .header-controls {
+  opacity: 1; /* Pleinement visible au survol */
+}
+
+/* Style pour la cellule d'en-tête */
+.room-cell {
+  position: relative; /* Pour le positionnement absolu des contrôles */
+  padding-right: 75px; /* Espace pour les contrôles */
+}
+
 /* Afficher les boutons uniquement au survol et seulement si aucun infirmier n'est assigné */
 .schedule-cell:hover .room-state-controls {
   display: flex;
+  gap: 4px;
+  margin-top: 5px;
 }
 
-/* Cacher les boutons si un infirmier est assigné */
+/* Masquer les contrôles dans les cellules qui contiennent un infirmier */
 .schedule-cell:has(.event) .room-state-controls {
   display: none;
+}
+
+.room-cell.loading {
+  opacity: 0.7;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .room-state-btn {

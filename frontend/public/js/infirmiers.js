@@ -154,6 +154,7 @@ function renderInfirmiersList() {
     li.dataset.id = infirmier.id;
     li.dataset.nom = infirmier.nom;
     li.dataset.prenom = infirmier.prenom;
+    li.dataset.status = infirmier.status;
     
     const statusClass = `status-${infirmier.status.replace('*', 'star').toLowerCase()}`;
     const presentClass = infirmier.present ? 'present' : 'absent';
@@ -161,7 +162,12 @@ function renderInfirmiersList() {
     li.innerHTML = `
       <div class="infirmier-info ${presentClass}">
         <span class="infirmier-name">${infirmier.prenom} ${infirmier.nom}</span>
-        <span class="infirmier-status ${statusClass}">${infirmier.status}</span>
+      </div>
+      <div class="status-buttons">
+        <button class="status-btn ${infirmier.status === 'J' ? 'active' : ''}" data-status="J" title="Statut J">J</button>
+        <button class="status-btn ${infirmier.status === 'J1' ? 'active' : ''}" data-status="J1" title="Statut J1">J1</button>
+        <button class="status-btn ${infirmier.status === 'J1*' ? 'active' : ''}" data-status="J1*" title="Statut J1*">J1*</button>
+        <button class="status-btn ${infirmier.status === 'J3' ? 'active' : ''}" data-status="J3" title="Statut J3">J3</button>
       </div>
       <div class="infirmier-actions">
         <button class="btn-edit" title="Modifier"><i class="fas fa-edit"></i></button>
@@ -169,9 +175,14 @@ function renderInfirmiersList() {
       </div>
     `;
     
-    // Ajouter les écouteurs d'événements pour les boutons
+    // Ajouter les écouteurs d'événements pour les boutons d'action
     li.querySelector('.btn-edit').addEventListener('click', () => editInfirmier(infirmier.id));
     li.querySelector('.btn-delete').addEventListener('click', () => deleteInfirmier(infirmier.id));
+    
+    // Ajouter les écouteurs d'événements pour les boutons de statut
+    li.querySelectorAll('.status-btn').forEach(btn => {
+      btn.addEventListener('click', () => updateInfirmierStatus(infirmier.id, btn.dataset.status));
+    });
     
     listElement.appendChild(li);
   });
@@ -260,6 +271,93 @@ function resetInfirmierForm() {
   editingId = null;
   document.querySelector('#infirmier-modal h3').textContent = 'Ajouter un infirmier';
   document.querySelector('#infirmier-form button[type="submit"]').textContent = 'Ajouter';
+}
+
+/**
+ * Met à jour le statut d'un infirmier directement depuis les boutons
+ * @param {number} id - ID de l'infirmier à mettre à jour
+ * @param {string} newStatus - Nouveau statut ('J', 'J1', 'J1*', 'J3')
+ */
+async function updateInfirmierStatus(id, newStatus) {
+  try {
+    // Trouver l'élément infirmier dans la liste
+    const infirmierItem = document.querySelector(`.infirmier-item[data-id="${id}"]`);
+    if (!infirmierItem) return;
+    
+    // Appliquer une classe de chargement pendant la requête
+    infirmierItem.classList.add('updating');
+    
+    // Rechercher l'infirmier dans notre liste locale
+    const infirmier = infirmiersList.find(inf => inf.id === id);
+    if (!infirmier) {
+      throw new Error(`Infirmier avec l'ID ${id} non trouvé dans la liste locale`);
+    }
+    
+    // Préparer les données pour la mise à jour (ne modifier que le statut)
+    const updateData = {
+      nom: infirmier.nom,
+      prenom: infirmier.prenom,
+      status: newStatus,
+      present: infirmier.present
+    };
+    
+    // Appel à l'API pour mettre à jour l'infirmier
+    const response = await fetch(`${API_BASE_URL}/infirmiers/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erreur lors de la mise à jour du statut: ${response.status}`);
+    }
+    
+    const updatedInfirmier = await response.json();
+    
+    // Mettre à jour l'infirmier dans notre liste locale
+    const infirmierIndex = infirmiersList.findIndex(inf => inf.id === id);
+    if (infirmierIndex !== -1) {
+      infirmiersList[infirmierIndex] = updatedInfirmier;
+    }
+    
+    // Mettre à jour l'UI pour ce seul infirmier sans recharger toute la liste
+    updateInfirmierUI(infirmierItem, updatedInfirmier);
+    
+    // Afficher un message de succès discret
+    showMessage(`Statut de ${updatedInfirmier.prenom} ${updatedInfirmier.nom} mis à jour: ${newStatus}`, 'success');
+    
+  } catch (error) {
+    console.error('Erreur:', error);
+    showMessage(`Erreur lors de la mise à jour du statut: ${error.message}`, 'error');
+  } finally {
+    // Retirer la classe de chargement
+    const infirmierItem = document.querySelector(`.infirmier-item[data-id="${id}"]`);
+    if (infirmierItem) {
+      infirmierItem.classList.remove('updating');
+    }
+  }
+}
+
+/**
+ * Met à jour l'interface pour un infirmier spécifique après changement de statut
+ * @param {HTMLElement} itemElement - Élément DOM de l'infirmier 
+ * @param {Object} infirmier - Données mises à jour de l'infirmier
+ */
+function updateInfirmierUI(itemElement, infirmier) {
+  // Mise à jour des attributs data
+  itemElement.dataset.status = infirmier.status;
+  
+  // Mise à jour des boutons de statut
+  const statusButtons = itemElement.querySelectorAll('.status-btn');
+  statusButtons.forEach(btn => {
+    if (btn.dataset.status === infirmier.status) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 }
 
 /**

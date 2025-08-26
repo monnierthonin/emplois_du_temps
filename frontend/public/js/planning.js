@@ -16,7 +16,91 @@ let currentWeekStart = null;
 function initPlanningModule() {
   setupWeekNavigation();
   addRoomStateControlsToAllCells();
+  addRoomStateControlsToHeaders();
   setCurrentWeek(getCurrentWeekStart());
+}
+
+/**
+ * Gère le changement d'état d'une salle sur tous les jours de la semaine courante
+ * @param {string} room - Identifiant de la salle (ex: salle16, reveil1)
+ * @param {string|null} state - Le nouvel état ('close', 'unuse' ou null pour ouvert)
+ */
+async function handleWeeklyRoomStateChange(room, state) {
+  try {
+    // Si aucune semaine n'est actuellement chargée, on ne fait rien
+    if (!currentWeekStart) return;
+    
+    // Indication visuelle pendant le chargement
+    const roomHeaders = document.querySelectorAll(`.room-cell[data-room="${room}"]`);
+    roomHeaders.forEach(header => header.classList.add('loading'));
+    
+    // Préparer les dates pour chaque jour de la semaine
+    const dates = [];
+    for (let i = 0; i < 5; i++) { // Du lundi au vendredi
+      const dayDate = new Date(currentWeekStart);
+      dayDate.setDate(currentWeekStart.getDate() + i);
+      dates.push(dayDate.toISOString().split('T')[0]); // Format YYYY-MM-DD
+    }
+    
+    // Compteurs pour les résultats
+    let successCount = 0;
+    let skippedCount = 0;
+    
+    // Pour chaque jour de la semaine
+    for (const date of dates) {
+      // Vérifier si un infirmier est déjà assigné à cette salle ce jour-là
+      const cell = document.querySelector(`.schedule-cell[data-date="${date}"][data-room="${room}"]`);
+      
+      if (cell && cell.querySelector('.event')) {
+        // Si un infirmier est déjà assigné, on ne modifie pas cette cellule
+        skippedCount++;
+        continue;
+      }
+      
+      // Appel à l'API pour mettre à jour l'état de la salle
+      try {
+        const response = await fetch(`${API_BASE_URL}/salle-state`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            date: date,
+            salle: room,
+            state: state
+          })
+        });
+        
+        if (response.ok) {
+          successCount++;
+          // Mettre à jour visuellement la cellule si elle existe
+          if (cell) {
+            updateRoomStateUI(cell, state);
+          }
+        }
+      } catch (cellError) {
+        console.error(`Erreur pour la salle ${room} le ${date}:`, cellError);
+      }
+    }
+    
+    // Message de confirmation avec le résumé des actions
+    const stateMsg = state ? (state === 'close' ? 'fermée' : 'marquée comme non utilisée') : 'ouverte';
+    const skipMsg = skippedCount > 0 ? ` (${skippedCount} jours ignorés car un infirmier y est déjà assigné)` : '';
+    showMessage(`Salle ${room} ${stateMsg} pour ${successCount} jours de la semaine${skipMsg}`, 'success');
+    
+    // Recharger les états des salles pour mettre à jour l'affichage
+    if (currentWeekStart) {
+      await loadRoomStates(currentWeekStart);
+    }
+    
+  } catch (error) {
+    console.error('Erreur lors du changement d\'\u00e9tat de la salle sur la semaine:', error);
+    showMessage('Erreur lors du changement d\'\u00e9tat de la salle. Veuillez réessayer.', 'error');
+  } finally {
+    // Retirer l'indication de chargement
+    const roomHeaders = document.querySelectorAll(`.room-cell[data-room="${room}"]`);
+    roomHeaders.forEach(header => header.classList.remove('loading'));
+  }
 }
 
 /**
@@ -368,6 +452,79 @@ function updateRoomStateUI(cell, state) {
 }
 
 /**
+ * Ajoute des contrôles d'état aux cellules d'en-tête des salles pour permettre
+ * de modifier l'état d'une salle sur tous les jours de la semaine
+ */
+function addRoomStateControlsToHeaders() {
+  // Sélectionner toutes les cellules d'en-tête des salles
+  const roomHeaders = document.querySelectorAll('.room-cell');
+  
+  roomHeaders.forEach(header => {
+    // Extraire le nom de la salle à partir du texte de l'en-tête
+    const roomText = header.textContent.trim();
+    let roomKey = '';
+    
+    // Convertir le nom affiché en clé utilisée dans l'API
+    if (roomText.startsWith('Salle ')) {
+      const roomNumber = roomText.replace('Salle ', '');
+      roomKey = 'salle' + roomNumber;
+    } else if (roomText.startsWith('Réveil ')) {
+      const roomNumber = roomText.replace('Réveil ', '');
+      roomKey = 'reveil' + roomNumber;
+    } else if (roomText === 'Pré-induction') {
+      roomKey = 'perinduction';
+    }
+    
+    if (roomKey) {
+      // Stocker la clé de la salle comme attribut data
+      header.setAttribute('data-room', roomKey);
+      
+      // Créer le conteneur pour les boutons d'état
+      const controlsContainer = document.createElement('div');
+      controlsContainer.className = 'room-state-controls header-controls';
+      
+      // Bouton pour ouvrir la salle (état normal) sur toute la semaine
+      const openBtn = document.createElement('button');
+      openBtn.className = 'room-state-btn btn-open';
+      openBtn.innerHTML = '✓';
+      openBtn.title = 'Ouvrir la salle pour toute la semaine';
+      openBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleWeeklyRoomStateChange(roomKey, null);
+      });
+      
+      // Bouton pour marquer comme "non utilisée" sur toute la semaine
+      const unuseBtn = document.createElement('button');
+      unuseBtn.className = 'room-state-btn btn-unuse';
+      unuseBtn.innerHTML = '!';
+      unuseBtn.title = 'Marquer comme non utilisée pour toute la semaine';
+      unuseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleWeeklyRoomStateChange(roomKey, 'unuse');
+      });
+      
+      // Bouton pour fermer la salle sur toute la semaine
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'room-state-btn btn-close';
+      closeBtn.innerHTML = 'X';
+      closeBtn.title = 'Fermer la salle pour toute la semaine';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleWeeklyRoomStateChange(roomKey, 'close');
+      });
+      
+      // Ajouter les boutons au conteneur
+      controlsContainer.appendChild(openBtn);
+      controlsContainer.appendChild(unuseBtn);
+      controlsContainer.appendChild(closeBtn);
+      
+      // Ajouter le conteneur à l'en-tête
+      header.appendChild(controlsContainer);
+    }
+  });
+}
+
+/**
  * Charge les états des salles pour une période donnée
  * @param {Date} weekStartDate - Date du début de semaine
  */
@@ -428,14 +585,56 @@ function formatDate(dateStr) {
  * @param {string} type - Type de message ('success', 'error', 'info')
  */
 function showMessage(message, type = 'info') {
-  // Vérifier si la fonction existe déjà dans le contexte global
-  if (window.showMessage && typeof window.showMessage === 'function') {
-    window.showMessage(message, type);
+  // Vérifier si la fonction existe dans un autre module (infirmiers.js par exemple)
+  // mais éviter de s'appeler elle-même (récursion infinie)
+  if (window.showNotification && typeof window.showNotification === 'function' && window.showNotification !== showMessage) {
+    window.showNotification(message, type);
   } else {
-    // Implémentation de secours
-    alert(message);
+    // Implémentation directe
+    const notifContainer = document.getElementById('notification-container') || createNotificationContainer();
+    
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+      <div class="notification-content">
+        <span>${message}</span>
+        <button class="notification-close">&times;</button>
+      </div>
+    `;
+    
+    // Ajouter au conteneur
+    notifContainer.appendChild(notification);
+    
+    // Ajouter l'écouteur d'événement pour fermer
+    notification.querySelector('.notification-close').addEventListener('click', () => {
+      notification.remove();
+    });
+    
+    // Auto-suppression après 5 secondes
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 5000);
+    
+    // Log dans la console également
     console.log(`${type.toUpperCase()}: ${message}`);
   }
+}
+
+/**
+ * Crée le conteneur de notifications s'il n'existe pas
+ * @returns {HTMLElement} Le conteneur de notifications
+ */
+function createNotificationContainer() {
+  const container = document.createElement('div');
+  container.id = 'notification-container';
+  container.style.position = 'fixed';
+  container.style.bottom = '20px';
+  container.style.right = '20px';
+  container.style.zIndex = '9999';
+  document.body.appendChild(container);
+  return container;
 }
 
 /**
