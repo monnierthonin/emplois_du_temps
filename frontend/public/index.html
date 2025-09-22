@@ -37,25 +37,7 @@
       <section class="statistique-section">
         <h3>Statistiques</h3>
         <div class="statistique-content">
-          <p>Les statistiques d'affectation des infirmiers seront affichées ici.</p>
-          <div class="shift-types">
-            <div class="shift-type">
-              <div class="color-dot morning"></div>
-              <span>Matin (7h-15h)</span>
-            </div>
-            <div class="shift-type">
-              <div class="color-dot afternoon"></div>
-              <span>Après-midi (14h-22h)</span>
-            </div>
-            <div class="shift-type">
-              <div class="color-dot night"></div>
-              <span>Nuit (21h-8h)</span>
-            </div>
-            <div class="shift-type">
-              <div class="color-dot off"></div>
-              <span>Repos</span>
-            </div>
-          </div>
+          <canvas id="stats-chart" height="260"></canvas>
         </div>
       </section>
     </div>
@@ -284,5 +266,7 @@
   <script src="js/infirmiers.js"></script>
   <script src="js/planning.js"></script>
   <script src="js/drag-drop.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="js/stats.js"></script>
 </body>
 </html>

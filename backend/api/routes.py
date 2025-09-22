@@ -28,6 +28,71 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# ============================
+# Helpers: statistiques / labels
+# ============================
+
+def parse_label(label: str):
+    """Parse a label of the form 'Prenom Nom - Status' and return (prenom, nom, status or None).
+    Be tolerant to extra spaces and optional ' - Status'."""
+    if not label:
+        return None, None, None
+    parts = label.split('-')
+    left = parts[0].strip()
+    status = parts[1].strip() if len(parts) > 1 else None
+    # Split left into prenom and nom by last space (to be a bit more tolerant)
+    if ' ' in left:
+        prenom = left.split(' ')[0].strip()
+        nom = ' '.join(left.split(' ')[1:]).strip()
+    else:
+        # Fallback if we cannot split properly
+        prenom = left.strip()
+        nom = ''
+    return prenom, nom, status
+
+def get_infirmier_id_from_label(conn, label: str):
+    prenom, nom, status = parse_label(label)
+    if not prenom:
+        return None
+    if status:
+        row = conn.execute(
+            'SELECT id FROM listeInfirmier WHERE prenom = ? AND nom = ? AND status = ? LIMIT 1',
+            (prenom, nom, status)
+        ).fetchone()
+    else:
+        row = conn.execute(
+            'SELECT id FROM listeInfirmier WHERE prenom = ? AND nom = ? LIMIT 1',
+            (prenom, nom)
+        ).fetchone()
+    return row['id'] if row else None
+
+def ensure_stat_row(conn, infirmier_id: int):
+    if not infirmier_id:
+        return
+    row = conn.execute('SELECT id FROM statistique WHERE infirmierID = ?', (infirmier_id,)).fetchone()
+    if not row:
+        conn.execute('INSERT INTO statistique (infirmierID) VALUES (?)', (infirmier_id,))
+
+def increment_stat(conn, infirmier_id: int, salle: str):
+    if not infirmier_id or not salle:
+        return
+    ensure_stat_row(conn, infirmier_id)
+    conn.execute(f'UPDATE statistique SET {salle} = COALESCE({salle}, 0) + 1 WHERE infirmierID = ?', (infirmier_id,))
+    print_stat_table(conn)
+
+def decrement_stat(conn, infirmier_id: int, salle: str):
+    if not infirmier_id or not salle:
+        return
+    ensure_stat_row(conn, infirmier_id)
+    conn.execute(f'UPDATE statistique SET {salle} = CASE WHEN {salle} > 0 THEN {salle} - 1 ELSE 0 END WHERE infirmierID = ?', (infirmier_id,))
+    print_stat_table(conn)
+
+def print_stat_table(conn):
+    rows = conn.execute('SELECT * FROM statistique').fetchall()
+    print('[STATISTIQUE] Table complète:')
+    for r in rows:
+        print(dict(r))
+
 # Route pour récupérer tous les infirmiers
 @api_bp.route('/infirmiers', methods=['GET'])
 @api_bp.route('/infirmiers/', methods=['GET'])
@@ -40,6 +105,46 @@ def get_infirmiers():
         # Format la réponse pour correspondre aux attentes du frontend
         return jsonify({
             'infirmiers': [dict(infirmier) for infirmier in infirmiers]
+        })
+    except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.close()
+        return jsonify({'error': str(e)}), 500
+
+# ============================
+# Statistiques API
+# ============================
+
+@api_bp.route('/statistiques', methods=['GET'])
+def get_statistiques():
+    try:
+        conn = get_db_connection()
+
+        rooms = SALLE_NAMES
+        # Join nurses with stats; if no stats row, coalesce to 0
+        cols = ', '.join([f"COALESCE(s.{r}, 0) AS {r}" for r in rooms])
+        query = f"""
+            SELECT i.id, i.prenom, i.nom, i.status, {cols}
+            FROM listeInfirmier i
+            LEFT JOIN statistique s ON s.infirmierID = i.id
+            ORDER BY i.prenom, i.nom
+        """
+        rows = conn.execute(query).fetchall()
+        conn.close()
+
+        datasets = []
+        for row in rows:
+            label = f"{row['prenom']} {row['nom']} - {row['status']}"
+            data = [row[r] for r in rooms]
+            datasets.append({
+                'id': row['id'],
+                'label': label,
+                'data': data
+            })
+
+        return jsonify({
+            'rooms': rooms,
+            'datasets': datasets
         })
     except Exception as e:
         if 'conn' in locals() and conn:
@@ -278,7 +383,29 @@ def assign_infirmier():
                     value = None
             else:
                 value = None
-        cursor.execute(f"UPDATE emploisDuTemps SET {salle} = ? WHERE date = ?", (value, date))
+        # Statistiques selon les cas
+        existing = emploi[salle] if emploi else None
+        if value is None:
+            # Cas: on veut effacer l'affectation via assign-infirmier
+            if existing:
+                old_id = get_infirmier_id_from_label(conn, existing)
+                if old_id:
+                    decrement_stat(conn, old_id, salle)
+            cursor.execute(f"UPDATE emploisDuTemps SET {salle} = NULL WHERE date = ?", (date,))
+        else:
+            # Cas: on assigne un nouveau label
+            # Si on remplace une valeur différente, décrémenter l'ancienne
+            if existing and existing != value:
+                old_id = get_infirmier_id_from_label(conn, existing)
+                if old_id:
+                    decrement_stat(conn, old_id, salle)
+            # Mettre à jour la valeur
+            cursor.execute(f"UPDATE emploisDuTemps SET {salle} = ? WHERE date = ?", (value, date))
+            # Incrémenter la nouvelle statistique
+            new_id = get_infirmier_id_from_label(conn, value)
+            if new_id:
+                increment_stat(conn, new_id, salle)
+
         conn.commit()
 
         conn.close()
@@ -313,6 +440,12 @@ def reset_assignment():
         if not emploi or not emploi[salle]:
             conn.close()
             return jsonify({'error': 'Aucune affectation trouvée'}), 404
+
+        # Avant de réinitialiser, décrémenter la statistique associée à l'ancien label
+        old_label = emploi[salle]
+        old_id = get_infirmier_id_from_label(conn, old_label)
+        if old_id:
+            decrement_stat(conn, old_id, salle)
 
         # Réinitialiser l'affectation
         conn.execute(f'UPDATE emploisDuTemps SET {salle} = NULL WHERE date = ?', (date,))
@@ -369,13 +502,17 @@ def update_salle_state():
             f"UPDATE emploisDuTemps SET {salle}_state = ? WHERE date = ?",
             (state, date)
         )
-        
+
         # Si l'état est 'close' ou 'unuse', on doit retirer l'infirmier de cette salle
         if state in ['close', 'unuse']:
-            cursor.execute(
-                f"UPDATE emploisDuTemps SET {salle} = NULL WHERE date = ?",
-                (date,)
-            )
+            # Si un label est présent, décrémenter les stats avant d'effacer
+            emploi_before = conn.execute('SELECT * FROM emploisDuTemps WHERE date = ?', (date,)).fetchone()
+            if emploi_before and emploi_before[salle]:
+                old_label = emploi_before[salle]
+                old_id = get_infirmier_id_from_label(conn, old_label)
+                if old_id:
+                    decrement_stat(conn, old_id, salle)
+            cursor.execute(f"UPDATE emploisDuTemps SET {salle} = NULL WHERE date = ?", (date,))
         
         conn.commit()
         

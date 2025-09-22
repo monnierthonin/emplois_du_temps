@@ -150,6 +150,10 @@ async function handleWeeklyRoomStateChange(room, state) {
     if (currentWeekStart) {
       await loadRoomStates(currentWeekStart);
     }
+    // Rafraîchir les statistiques en temps réel (au cas où des affectations ont été supprimées)
+    if (window.StatsChartManager && typeof window.StatsChartManager.refresh === 'function') {
+      await window.StatsChartManager.refresh();
+    }
     
   } catch (error) {
     console.error('Erreur lors du changement d\'\u00e9tat de la salle sur la semaine:', error);
@@ -475,9 +479,13 @@ async function handleRoomStateChange(cell, state) {
     updateRoomStateUI(cell, state);
     
     // Si l'état est 'close' ou 'unuse', l'API aura déjà retiré l'infirmier de cette salle
-    // Recharger les données pour mettre à jour l'affichage
+    // Recharger les états des salles pour mettre à jour l'affichage
     if (currentWeekStart) {
       loadRoomStates(currentWeekStart);
+    }
+    // Rafraîchir les statistiques (décrément possible côté backend)
+    if (window.StatsChartManager && typeof window.StatsChartManager.refresh === 'function') {
+      await window.StatsChartManager.refresh();
     }
     
     // Montrer un message de confirmation
@@ -926,6 +934,11 @@ async function removeInfirmierFromCell(date, room, cell) {
     // Nettoyer la cellule
     const existingEvents = cell.querySelectorAll('.event');
     existingEvents.forEach(event => event.remove());
+
+    // Rafraîchir les statistiques en temps réel après suppression
+    if (window.StatsChartManager && typeof window.StatsChartManager.refresh === 'function') {
+      await window.StatsChartManager.refresh();
+    }
     
     // Recharger les données de la semaine pour mettre à jour tout l'affichage
     if (currentWeekStart) {

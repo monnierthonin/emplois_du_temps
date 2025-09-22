@@ -302,6 +302,10 @@ async function assignInfirmierToCell(infirmierData, cell, date, room) {
     if (currentWeekStart) {
       loadWeekData(currentWeekStart);
     }
+    // Rafraîchir les statistiques en temps réel
+    if (window.StatsChartManager && typeof window.StatsChartManager.refresh === 'function') {
+      await window.StatsChartManager.refresh();
+    }
     
   } catch (error) {
     console.error('Erreur lors de l\'assignation de l\'infirmier:', error);
@@ -412,6 +416,10 @@ async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, 
     // 6. Recharger les données de la semaine pour mettre à jour tout l'affichage
     if (currentWeekStart) {
       loadWeekData(currentWeekStart);
+    }
+    // Rafraîchir les statistiques en temps réel
+    if (window.StatsChartManager && typeof window.StatsChartManager.refresh === 'function') {
+      await window.StatsChartManager.refresh();
     }
 
   } catch (error) {
