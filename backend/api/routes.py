@@ -75,17 +75,6 @@ def delete_infirmier(id):
             conn.close()
             return jsonify({'error': 'Infirmier non trouvé'}), 404
         
-        # Vérifier si l'infirmier est affecté à un emploi du temps (pour information uniquement)
-        emploi = conn.execute('''
-            SELECT * FROM emploisDuTemps 
-            WHERE salle16 = ? OR salle17 = ? OR salle18 = ? OR salle19 = ? OR 
-                  salle20 = ? OR salle21 = ? OR salle22 = ? OR salle23 = ? OR 
-                  salle24 = ? OR reveil1 = ? OR reveil2 = ? OR perinduction = ?
-        ''', (id,) * 12).fetchone()
-        
-        # On conserve l'information mais on n'empêche plus la suppression
-        isInSchedule = emploi is not None
-        
         # Supprimer d'abord les statistiques associées
         conn.execute('DELETE FROM statistique WHERE infirmierID = ?', (id,))
         
@@ -95,14 +84,7 @@ def delete_infirmier(id):
         conn.commit()
         conn.close()
         
-        # Message personnalisé selon que l'infirmier était assigné ou non
-        if isInSchedule:
-            return jsonify({
-                'success': True, 
-                'message': 'Infirmier supprimé avec succès. Note: cet infirmier était affecté à des emplois du temps mais a été retiré de la liste.'
-            })
-        else:
-            return jsonify({'success': True, 'message': 'Infirmier supprimé avec succès'})
+        return jsonify({'success': True, 'message': 'Infirmier supprimé avec succès'})
     except Exception as e:
         if 'conn' in locals() and conn:
             conn.close()
@@ -207,38 +189,30 @@ def get_emplois_du_temps_semaine():
         
         for emploi in emplois:
             emploi_dict = dict(emploi)
-            
-            # Récupérer les informations des infirmiers assignés pour chaque salle
-            infirmiers_info = {}
-            infirmier_count = {}  # Pour suivre les doublons
-            doublons = []  # Liste des salles avec des infirmiers en doublon
-            
-            for field in ['salle16', 'salle17', 'salle18', 'salle19', 'salle20', 'salle21', 
-                       'salle22', 'salle23', 'salle24', 'reveil1', 'reveil2', 'perinduction']:
-                if emploi[field]:
-                    infirmier_id = emploi[field]
-                    
-                    # Compter l'occurrence de cet infirmier
-                    if infirmier_id in infirmier_count:
-                        infirmier_count[infirmier_id].append(field)
+
+            # Avec le nouveau modèle, les colonnes de salle contiennent directement
+            # le libellé texte ("Prenom Nom - Status").
+            labels = {}
+            label_count = {}
+            doublons = []
+
+            for field in ['salle16', 'salle17', 'salle18', 'salle19', 'salle20', 'salle21',
+                          'salle22', 'salle23', 'salle24', 'reveil1', 'reveil2', 'perinduction']:
+                label = emploi[field]
+                if label:
+                    labels[field] = label
+                    if label in label_count:
+                        label_count[label].append(field)
                     else:
-                        infirmier_count[infirmier_id] = [field]
-                    
-                    infirmier = conn.execute(
-                        'SELECT id, nom, prenom FROM listeInfirmier WHERE id = ?', 
-                        (infirmier_id,)
-                    ).fetchone()
-                    if infirmier:
-                        infirmiers_info[field] = dict(infirmier)
-            
-            # Identifier les salles avec des infirmiers en doublon
-            for infirmier_id, salles in infirmier_count.items():
-                if len(salles) > 1:  # Si un infirmier apparaît plus d'une fois
+                        label_count[label] = [field]
+
+            # Identifier les salles avec le même libellé (doublons visuels)
+            for _, salles in label_count.items():
+                if len(salles) > 1:
                     doublons.extend(salles)
-            
-            # Ajouter les infos des infirmiers au dictionnaire de l'emploi du temps
-            emploi_dict['infirmiers_info'] = infirmiers_info
-            emploi_dict['doublons'] = doublons  # Ajouter l'info des doublons
+
+            emploi_dict['labels'] = labels
+            emploi_dict['doublons'] = doublons
             result.append(emploi_dict)
         
         conn.close()
@@ -249,7 +223,7 @@ def get_emplois_du_temps_semaine():
             conn.close()
         return jsonify({'error': str(e)}), 500
 
-# Route pour assigner un infirmier à une salle pour une date spécifique
+# Route pour assigner un infirmier (par libellé) à une salle pour une date spécifique
 @api_bp.route('/assign-infirmier', methods=['POST'])
 def assign_infirmier():
     if not request.json:
@@ -259,14 +233,15 @@ def assign_infirmier():
     data = request.json
     date = data.get('date')
     salle = data.get('salle')
-    # Accepter les deux formats possibles (infirmier_id ou infirmierId)
+    # Nouveau modèle: on reçoit un libellé de texte (label). Pour compat, on accepte encore *_id
+    label = data.get('label')
     infirmier_id = data.get('infirmier_id') if 'infirmier_id' in data else data.get('infirmierId')
     
     print(f"DEBUG: Assignation - date: {date}, salle: {salle}, infirmier_id: {infirmier_id}")
     
     # Vérifier que toutes les données nécessaires sont présentes
-    if not date or not salle or infirmier_id is None:
-        return jsonify({'error': 'Date, salle et ID infirmier sont requis'}), 400
+    if not date or not salle:
+        return jsonify({'error': 'Date et salle sont requis'}), 400
     
     try:
         conn = get_db_connection()
@@ -277,9 +252,8 @@ def assign_infirmier():
         if not emploi:
             # Si l'emploi du temps n'existe pas, le créer
             cursor = conn.cursor()
-            fields = ['date', 'salle16', 'salle17', 'salle18', 'salle19', 'salle20', 'salle21', 
-                    'salle22', 'salle23', 'salle24', 'reveil1', 'reveil2', 'perinduction']
-            values = [date] + [None for _ in range(len(fields)-1)]
+            fields = ['date'] + SALLE_NAMES + [f'{s}_state' for s in SALLE_NAMES]
+            values = [date] + [None for _ in range(len(SALLE_NAMES) * 2)]
             placeholders = ', '.join(['?' for _ in range(len(fields))])
             
             cursor.execute(
@@ -289,32 +263,31 @@ def assign_infirmier():
             conn.commit()
             emploi = conn.execute('SELECT * FROM emploisDuTemps WHERE date = ?', (date,)).fetchone()
         
-        # Mise à jour de l'affectation
+        # Déterminer la valeur à écrire (label prioritaire). Si label vide/None => NULL
         cursor = conn.cursor()
-        cursor.execute(
-            f"UPDATE emploisDuTemps SET {salle} = ? WHERE date = ?",
-            (infirmier_id if infirmier_id != 0 and infirmier_id != '0' else None, date)  # Si ID=0 ou '0', mettre NULL
-        )
+        value = None
+        if label is not None:
+            value = label.strip() or None
+        elif infirmier_id is not None:
+            # Compat: si on reçoit encore un ID, on le transforme en libellé en recherchant dans listeInfirmier
+            if str(infirmier_id) != '0':
+                inf = conn.execute('SELECT nom, prenom, status FROM listeInfirmier WHERE id = ?', (infirmier_id,)).fetchone()
+                if inf:
+                    value = f"{inf['prenom']} {inf['nom']} - {inf['status']}"
+                else:
+                    value = None
+            else:
+                value = None
+        cursor.execute(f"UPDATE emploisDuTemps SET {salle} = ? WHERE date = ?", (value, date))
         conn.commit()
-        
-        # Récupérer l'infirmier pour inclure ses informations dans la réponse
-        infirmier_info = None
-        if infirmier_id and infirmier_id != 0 and infirmier_id != '0':
-            infirmier = conn.execute('SELECT * FROM listeInfirmier WHERE id = ?', (infirmier_id,)).fetchone()
-            if infirmier:
-                infirmier_info = dict(infirmier)
-        
-        # Pour mettre à jour les statistiques, on peut utiliser la fonction existante
-        # Mais pour cela on doit la réimplémenter ici
-        
+
         conn.close()
         
         return jsonify({
             'success': True,
             'date': date,
             'salle': salle,
-            'infirmier_id': infirmier_id,
-            'infirmier': infirmier_info
+            'label': value
         })
         
     except Exception as e:
@@ -334,19 +307,13 @@ def reset_assignment():
     try:
         conn = get_db_connection()
         
-        # Récupérer l'ID de l'infirmier actuellement assigné
+        # Récupérer l'affectation actuelle
         emploi = conn.execute('SELECT * FROM emploisDuTemps WHERE date = ?', (date,)).fetchone()
-        
+
         if not emploi or not emploi[salle]:
             conn.close()
             return jsonify({'error': 'Aucune affectation trouvée'}), 404
-        
-        infirmier_id = emploi[salle]
-        
-        # Mettre à jour les statistiques avant de réinitialiser
-        conn.execute(f'UPDATE statistique SET {salle} = {salle} - 1 WHERE infirmierID = ? AND {salle} > 0',
-                    (infirmier_id,))
-        
+
         # Réinitialiser l'affectation
         conn.execute(f'UPDATE emploisDuTemps SET {salle} = NULL WHERE date = ?', (date,))
         
@@ -461,18 +428,23 @@ def get_salle_states(date):
             conn.close()
         return jsonify({'error': str(e)}), 500
 
-# Route pour vérifier si un infirmier est déjà assigné à une date spécifique
+# Route pour vérifier si un libellé est déjà assigné à une date spécifique
 @api_bp.route('/check-nurse-availability', methods=['GET', 'POST'])
 def check_nurse_availability():
     # Récupérer les données en fonction de la méthode HTTP
     if request.method == 'GET':
-        infirmier_id = request.args.get('infirmier_id')
+        label = request.args.get('label')
         date = request.args.get('date')
         current_room = request.args.get('current_room', None)
     else:  # POST
-        if not request.json or 'infirmierId' not in request.json or 'date' not in request.json:
+        if not request.json or ('label' not in request.json and 'infirmierId' not in request.json) or 'date' not in request.json:
             return jsonify({'error': 'Données incomplètes'}), 400
-        infirmier_id = request.json['infirmierId']
+        label = request.json.get('label')
+        if label is None and 'infirmierId' in request.json:
+            # Compat: on peut convertir un ID en label si besoin
+            with get_db_connection() as conn:
+                inf = conn.execute('SELECT nom, prenom, status FROM listeInfirmier WHERE id = ?', (request.json['infirmierId'],)).fetchone()
+                label = f"{inf['prenom']} {inf['nom']} - {inf['status']}" if inf else None
         date = request.json['date']
         current_room = request.json.get('sourceSalle', None)
     
@@ -491,10 +463,10 @@ def check_nurse_availability():
                 'sallesOccupees': []
             })
         
-        # Vérifier dans quelle salle l'infirmier est affecté ce jour-là
+        # Vérifier dans quelle salle ce libellé est affecté ce jour-là
         assigned_room = None
         for field in SALLE_NAMES:
-            if str(emploi[field]) == str(infirmier_id):
+            if emploi[field] and label and str(emploi[field]) == str(label):
                 assigned_room = field
                 break
         
@@ -506,7 +478,7 @@ def check_nurse_availability():
         
         conn.close()
         
-        # Si l'infirmier n'est affecté nulle part ou s'il est affecté dans la salle actuelle (déplacement)
+        # Si le libellé n'est affecté nulle part ou s'il est affecté dans la salle actuelle (déplacement)
         available = assigned_room is None or assigned_room == current_room
         
         return jsonify({
