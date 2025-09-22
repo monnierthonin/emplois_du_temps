@@ -98,6 +98,7 @@ function handleDragStart(e) {
   const infirmierId = this.dataset.id;
   const infirmierNom = this.dataset.nom;
   const infirmierPrenom = this.dataset.prenom;
+  const infirmierStatus = this.dataset.status;
   
   console.log('Début de drag:', { infirmierId, infirmierNom, infirmierPrenom });
   
@@ -110,11 +111,18 @@ function handleDragStart(e) {
     return;
   }
   
-  // Définir les données de transfert
+  // Construire le libellé complet (nouveau modèle)
+  const label = (infirmierPrenom && infirmierNom)
+    ? `${infirmierPrenom} ${infirmierNom}${infirmierStatus ? ' - ' + infirmierStatus : ''}`
+    : '';
+
+  // Définir les données de transfert (inclure le label)
   e.dataTransfer.setData('text/plain', JSON.stringify({
     id: infirmierId,
     nom: infirmierNom,
-    prenom: infirmierPrenom
+    prenom: infirmierPrenom,
+    status: infirmierStatus,
+    label: label
   }));
   
   // Définir une image de drag (optionnel)
@@ -196,8 +204,8 @@ function handleDrop(e) {
     console.log('Données reçues lors du drop:', rawData);
     const infirmierData = JSON.parse(rawData);
     
-    // Vérifier que les données essentielles sont présentes
-    if (!infirmierData.id) {
+    // Vérifier que les données essentielles sont présentes (label ou id)
+    if (!infirmierData.label && !infirmierData.id) {
       throw new Error('Données infirmier incomplètes');
     }
     
@@ -262,20 +270,19 @@ async function assignInfirmierToCell(infirmierData, cell, date, room) {
     // Afficher un indicateur de chargement sur la cellule
     cell.classList.add('loading');
     
-    // Préparer les données pour l'API
-    const updateData = {
-      date: date,
-      [room]: infirmierData.id
-    };
+    // Construire le label (priorité à ce qui est déjà fourni)
+    const label = (infirmierData.label && infirmierData.label.trim())
+      ? infirmierData.label.trim()
+      : `${infirmierData.prenom} ${infirmierData.nom}${infirmierData.status ? ' - ' + infirmierData.status : ''}`;
     
-    // Appeler l'API pour assigner un infirmier - utiliser le bon endpoint /assign-infirmier
+    // Appeler l'API pour assigner par label - endpoint /assign-infirmier
     const response = await fetch(`${API_BASE_URL}/assign-infirmier`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        infirmierId: infirmierData.id,
+        label: label,
         date: date,
         salle: room
       })
@@ -289,7 +296,7 @@ async function assignInfirmierToCell(infirmierData, cell, date, room) {
     const result = await response.json();
     
     // Mettre à jour l'affichage visuel
-    updateVisualAssignment(infirmierData, cell);
+    updateVisualAssignment({ label }, cell);
     
     // Recharger les données de la semaine pour mettre à jour tout l'affichage
     if (currentWeekStart) {
@@ -318,7 +325,8 @@ function updateVisualAssignment(infirmierData, cell) {
   // Créer un nouvel élément pour l'infirmier
   const eventElement = document.createElement('div');
   eventElement.className = 'event';
-  eventElement.textContent = `${infirmierData.prenom} ${infirmierData.nom}`;
+  // Afficher le label si disponible, sinon fallback sur prenom/nom
+  eventElement.textContent = infirmierData.label || `${infirmierData.prenom || ''} ${infirmierData.nom || ''}`.trim();
   
   // Ajouter l'élément à la cellule
   cell.appendChild(eventElement);
@@ -349,7 +357,7 @@ async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, 
     // 1. Vérifier la disponibilité de l'infirmier à la date cible, en excluant la salle source
     if (sourceDate === targetDate && sourceRoom !== targetRoom) {
       const availabilityResponse = await fetch(
-        `${API_BASE_URL}/check-nurse-availability?infirmier_id=${infirmierData.id}&date=${targetDate}&current_room=${sourceRoom}`
+        `${API_BASE_URL}/check-nurse-availability?label=${encodeURIComponent(infirmierData.label)}&date=${targetDate}&current_room=${sourceRoom}`
       );
 
       if (!availabilityResponse.ok) {
@@ -372,7 +380,7 @@ async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, 
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        infirmierId: 0, // 0 signifie supprimer
+        label: null, // null signifie supprimer
         date: sourceDate,
         salle: sourceRoom
       })
@@ -385,7 +393,7 @@ async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, 
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        infirmierId: infirmierData.id,
+        label: infirmierData.label,
         date: targetDate,
         salle: targetRoom
       })
@@ -421,10 +429,17 @@ async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, 
  */
 async function checkNurseAvailability(infirmierId, date, currentRoom = null) {
   try {
-    let url = `${API_BASE_URL}/check-nurse-availability?infirmier_id=${infirmierId}&date=${date}`;
-    if (currentRoom) {
-      url += `&current_room=${currentRoom}`;
+    // Convertir l'ID en libellé à partir de la liste DOM si possible
+    let label = null;
+    const item = document.querySelector(`#infirmiers-list li[data-id="${infirmierId}"]`);
+    if (item) {
+      const nom = item.dataset.nom || '';
+      const prenom = item.dataset.prenom || '';
+      const status = item.dataset.status || '';
+      label = `${prenom} ${nom}${status ? ' - ' + status : ''}`.trim();
     }
+    let url = `${API_BASE_URL}/check-nurse-availability?label=${encodeURIComponent(label || '')}&date=${date}`;
+    if (currentRoom) url += `&current_room=${currentRoom}`;
 
     console.log(`Vérification de disponibilité: ${url}`);
     const response = await fetch(url);

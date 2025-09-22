@@ -21,6 +21,64 @@ function initPlanningModule() {
 }
 
 /**
+ * Ajoute un libellé (texte) à une cellule du planning et l'active pour le drag
+ * @param {HTMLElement} cell
+ * @param {string} label
+ */
+function addLabelToCell(cell, label) {
+  // Nettoyer la cellule
+  const existingEvents = cell.querySelectorAll('.event');
+  existingEvents.forEach(event => event.remove());
+
+  const container = document.createElement('div');
+  container.className = 'event assigned-infirmier';
+  container.setAttribute('draggable', 'true');
+  container.style.backgroundColor = '#a3c1ad';
+  container.style.color = '#333';
+  container.style.padding = '2px 5px';
+  container.style.borderRadius = '3px';
+  container.style.fontSize = '0.9em';
+  container.style.fontWeight = 'bold';
+  container.style.display = 'flex';
+  container.style.justifyContent = 'space-between';
+  container.style.alignItems = 'center';
+  container.style.cursor = 'grab';
+
+  container.dataset.label = label;
+
+  const nameElement = document.createElement('span');
+  nameElement.textContent = label;
+  container.appendChild(nameElement);
+
+  const deleteButton = document.createElement('button');
+  deleteButton.textContent = 'X';
+  deleteButton.style.marginLeft = '5px';
+  deleteButton.style.background = 'none';
+  deleteButton.style.border = 'none';
+  deleteButton.style.color = '#555';
+  deleteButton.style.fontWeight = 'bold';
+  deleteButton.style.cursor = 'pointer';
+  deleteButton.style.fontSize = '0.8em';
+  deleteButton.style.padding = '0px 3px';
+  deleteButton.title = 'Retirer de cette salle';
+  deleteButton.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const cellEl = this.closest('.schedule-cell');
+    const date = cellEl.getAttribute('data-date');
+    const room = cellEl.getAttribute('data-room');
+    if (date && room) {
+      removeInfirmierFromCell(date, room, cellEl);
+    }
+  });
+  container.appendChild(deleteButton);
+
+  container.addEventListener('dragstart', handleInfirmierDragStart);
+  container.addEventListener('dragend', handleInfirmierDragEnd);
+
+  cell.appendChild(container);
+}
+
+/**
  * Gère le changement d'état d'une salle sur tous les jours de la semaine courante
  * @param {string} room - Identifiant de la salle (ex: salle16, reveil1)
  * @param {string|null} state - Le nouvel état ('close', 'unuse' ou null pour ouvert)
@@ -668,65 +726,43 @@ async function loadWeekData(weekStartDate) {
     // Charger également les états des salles
     await loadRoomStates(weekStartDate);
     
-    // Ajouter les événements au calendrier
+    // Ajouter les événements au calendrier (nouveau modèle via labels)
     if (data && data.length > 0) {
       data.forEach(item => {
-        // Date de l'événement (format YYYY-MM-DD attendu dans la réponse API)
         const dateStr = item.date;
-        
-        // Pour chaque salle, vérifier si un infirmier est assigné
         const salles = ['salle16', 'salle17', 'salle18', 'salle19', 'salle20', 'salle21', 
-                       'salle22', 'salle23', 'salle24', 'reveil1', 'reveil2', 'perinduction'];
-        
-        // Vérifier si nous avons des infos d'infirmier
-        if (item.infirmiers_info) {
-          // Vérifier d'abord si des doublons sont identifiés dans la réponse API
-          const doublons = item.doublons || [];
-          
-          // Appliquer la classe doublon aux salles concernées
-          if (doublons.length > 0) {
-            doublons.forEach(salle => {
-              const doublonCell = document.querySelector(`.schedule-cell[data-date="${dateStr}"][data-room="${salle}"]`);
-              if (doublonCell) {
-                doublonCell.classList.add('doublon');
-              }
-            });
-          }
-          
-          salles.forEach(salle => {
-            // Si un infirmier est assigné à cette salle
-            if (item.infirmiers_info[salle]) {
-              const infirmier = item.infirmiers_info[salle];
-              const salleNum = salle.replace('salle', ''); // Extraire le numéro de salle (16, 17, etc.)
-              
-              // Trouver la cellule correspondant à cette date et cette salle
-              const cell = document.querySelector(`.schedule-cell[data-date="${dateStr}"][data-room="${salle}"]`);
-              
-              if (cell) {
-                // Ajouter l'infirmier à la cellule
-                addInfirmierToCell(cell, infirmier);
-                
-                // Si cette salle est dans la liste des doublons, ajouter une info visuelle
-                if (doublons.includes(salle)) {
-                  const infoElement = document.createElement('div');
-                  infoElement.className = 'doublon-info';
-                  infoElement.textContent = '⚠️ Doublon';
-                  infoElement.title = 'Cet infirmier est affecté à plusieurs salles ce jour-là';
-                  infoElement.style.fontSize = '0.7em';
-                  infoElement.style.color = '#d32f2f';
-                  infoElement.style.marginTop = '2px';
-                  cell.appendChild(infoElement);
-                }
-              }
+                        'salle22', 'salle23', 'salle24', 'reveil1', 'reveil2', 'perinduction'];
+
+        const doublons = item.doublons || [];
+        if (doublons.length > 0) {
+          doublons.forEach(salle => {
+            const doublonCell = document.querySelector(`.schedule-cell[data-date="${dateStr}"][data-room="${salle}"]`);
+            if (doublonCell) {
+              doublonCell.classList.add('doublon');
             }
           });
-        } else {
-          // Ancienne méthode (maintenir la compatibilité)
-          const cell = document.querySelector(`.schedule-cell[data-date="${dateStr}"]`);
-          if (cell) {
-            addEventToCell(cell, item.prenom, item.service);
-          }
         }
+
+        const labels = item.labels || {};
+        salles.forEach(salle => {
+          const label = labels[salle];
+          if (label) {
+            const cell = document.querySelector(`.schedule-cell[data-date="${dateStr}"][data-room="${salle}"]`);
+            if (cell) {
+              addLabelToCell(cell, label);
+              if (doublons.includes(salle)) {
+                const infoElement = document.createElement('div');
+                infoElement.className = 'doublon-info';
+                infoElement.textContent = '⚠️ Doublon';
+                infoElement.title = 'Ce libellé est affecté à plusieurs salles ce jour-là';
+                infoElement.style.fontSize = '0.7em';
+                infoElement.style.color = '#d32f2f';
+                infoElement.style.marginTop = '2px';
+                cell.appendChild(infoElement);
+              }
+            }
+          }
+        });
       });
     }
   } catch (error) {
@@ -810,14 +846,13 @@ function addInfirmierToCell(cell, infirmier) {
   container.style.alignItems = 'center';
   container.style.cursor = 'grab'; // Curseur indiquant que l'élément est déplaçable
   
-  // Stocker les informations de l'infirmier comme attributs data pour référence future
-  container.dataset.infirmierId = infirmier.id;
-  container.dataset.infirmierNom = infirmier.nom;
-  container.dataset.infirmierPrenom = infirmier.prenom;
+  // Nouveau modèle basé sur libellé; conserver l'ancien fallback si dispo
+  const label = `${infirmier.prenom || ''} ${infirmier.nom || ''}`.trim();
+  container.dataset.label = infirmier.label || label;
   
   // Créer l'élément pour le nom de l'infirmier
   const nameElement = document.createElement('span');
-  nameElement.textContent = `${infirmier.prenom} ${infirmier.nom}`;
+  nameElement.textContent = infirmier.label || `${infirmier.prenom || ''} ${infirmier.nom || ''}`.trim();
   container.appendChild(nameElement);
   
   // Créer le bouton de suppression
@@ -913,10 +948,8 @@ async function removeInfirmierFromCell(date, room, cell) {
  * @param {DragEvent} e - L'événement de drag
  */
 function handleInfirmierDragStart(e) {
-  // Stocker les informations de l'infirmier et de la cellule d'origine
-  const infirmierId = this.dataset.infirmierId;
-  const infirmierNom = this.dataset.infirmierNom;
-  const infirmierPrenom = this.dataset.infirmierPrenom;
+  // Stocker les informations (nouveau modèle: libellé)
+  const label = this.dataset.label;
   
   // Récupérer les informations de la cellule d'origine
   const sourceCell = this.closest('.schedule-cell');
@@ -925,12 +958,10 @@ function handleInfirmierDragStart(e) {
   
   // Stocker les données pour le transfert
   const transferData = {
-    id: infirmierId,
-    nom: infirmierNom,
-    prenom: infirmierPrenom,
+    label: label,
     sourceDate: sourceDate,
     sourceRoom: sourceRoom,
-    isFromCell: true // Indique que l'infirmier vient d'une cellule et non de la liste
+    isFromCell: true
   };
   
   e.dataTransfer.setData('text/plain', JSON.stringify(transferData));
@@ -991,7 +1022,7 @@ async function moveInfirmierBetweenCells(infirmierData, targetCell, targetDate, 
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        infirmierId: infirmierData.id,
+        label: infirmierData.label,
         date: targetDate,
         salle: targetRoom
       })
